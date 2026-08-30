@@ -60,45 +60,42 @@ with col3:
 with col4:
     orario_scelta = st.time_input("Orario Arrivo", value=oggi.time())
 
-if st.button("Assegna Tavolo al Cliente"):
-    if not cognome:
-        st.error("Inserisci il cognome del cliente prima di salvare.")
-    else:
-        ora_inizio = datetime.combine(oggi.date(), orario_scelta)
-        ora = orario_scelta.hour
-        
-        if not ((1 <= ora < 15) or (16 <= ora < 22)):
-            st.warning("Orario fuori dalle fasce di apertura (1-15 o 16-22).")
+# Filtra i tavoli idonei e liberi in base al numero di persone selezionato
+tavoli_disponibili = []
+if persone <= 2:
+    tavoli_disponibili = [nome for nome, dati in tavoli_attuali.items() if dati["max_cap"] == 2 and dati["stato"] == "Libero"]
+else:
+    tavoli_disponibili = [nome for nome, dati in tavoli_attuali.items() if dati["max_cap"] == 4 and dati["stato"] == "Libero"]
+
+# Mostra la scelta manuale del tavolo
+if tavoli_disponibili:
+    tavolo_scelto = st.selectbox("Scegli il tavolo da assegnare:", tavoli_disponibili)
+    
+    if st.button("Assegna Tavolo Selezionato"):
+        if not cognome:
+            st.error("Inserisci il cognome del cliente prima di salvare.")
         else:
-            tavolo_assegnato = None
+            ora_inizio = datetime.combine(oggi.date(), orario_scelta)
+            ora = orario_scelta.hour
             
-            if persone <= 2:
-                for nome, dati in tavoli_attuali.items():
-                    if dati["max_cap"] == 2 and dati["stato"] == "Libero":
-                        tavolo_assegnato = nome
-                        break
-                if not tavolo_assegnato:
-                    st.warning("I tavoli da 2 sono tutti occupati! Non puoi usare un tavolo da 4 per 2 persone.")
-            
-            elif persone > 2:
-                for nome, dati in tavoli_attuali.items():
-                    if dati["max_cap"] == 4 and dati["stato"] == "Libero":
-                        tavolo_assegnato = nome
-                        break
-            
-            if tavolo_assegnato:
-                tavoli_attuali[tavolo_assegnato] = {
+            if not ((1 <= ora < 15) or (16 <= ora < 22)):
+                st.warning("Orario fuori dalle fasce di apertura (1-15 o 16-22).")
+            else:
+                tavoli_attuali[tavolo_scelto] = {
                     "stato": "Occupato",
                     "fino_a": ora_inizio + timedelta(minutes=120),
-                    "max_cap": tavoli_attuali[tavolo_assegnato]["max_cap"],
+                    "max_cap": tavoli_attuali[tavolo_scelto]["max_cap"],
                     "cliente": cognome,
                     "tel": telefono
                 }
                 salva_tavoli(tavoli_attuali)
-                st.success(f"Telefono registrato! Assegnato **{tavolo_assegnato}** a Sig. {cognome}")
+                st.success(f"Telefono registrato! Assegnato il **{tavolo_scelto}** a Sig. {cognome}")
                 st.rerun()
-            elif persone > 2:
-                st.error("Nessun tavolo da 4 disponibile al momento.")
+else:
+    if persone <= 2:
+        st.warning("⚠️ Tutti i tavoli da 2 sono occupati! (Regola: Non puoi scegliere un tavolo da 4 per sole 2 persone).")
+    else:
+        st.error("❌ Nessun tavolo da 4 disponibile al momento.")
 
 st.header("Situazione Sala")
 for nome, dati in tavoli_attuali.items():
