@@ -69,7 +69,7 @@ else:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Valj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0] # Prende solo "Bord X"
+    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrae correttamente "Bord X"
     
     if st.button("Boka valt bord"):
         if not cognome:
@@ -104,8 +104,9 @@ for nome, dati in bord_attuali.items():
     
     with col_bord:
         if dati["stato"] == "Libero":
+            # Nome tavolo GIALLO e grande (#FFD166), il resto testo normale
             st.markdown(
-                f"🟢 <span style='color: #4CC9F0; font-size: 22px; font-weight: bold;'>{nome}</span> "
+                f"🟢 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
                 f"({cap_testo}) | TILLGÄNGLIGT", 
                 unsafe_allow_html=True
             )
@@ -121,8 +122,9 @@ for nome, dati in bord_attuali.items():
             else:
                 countdown_testo = "⏳ Tiden har gått ut!"
                 
+            # Nome tavolo GIALLO e grande (#FFD166), il resto testo normale occupato
             st.markdown(
-                f"🔴 <span style='color: #F72585; font-size: 22px; font-weight: bold;'>{nome}</span> "
+                f"🔴 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
                 f"({cap_testo}) | UPPTAGET | Sluttid: {ora_fine} | **{countdown_testo}**", 
                 unsafe_allow_html=True
             )
