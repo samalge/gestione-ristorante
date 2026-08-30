@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 import json
 import os
 
@@ -12,43 +12,70 @@ def carica_bord():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
             dati = json.load(f)
-            for nome, info in dati.items():
-                if info["fino_a"]:
-                    info["fino_a"] = datetime.fromisoformat(info["fino_a"])
-            return dati
-    bord_dict = {f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 2, "cliente": "", "tel": ""} for i in range(1, 4)}
-    bord_dict.update({f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 4, "cliente": "", "tel": ""} for i in range(4, 11)})
-    return bord_dict
+            # Riconverte le chiavi delle date da stringhe a oggetti data e gli orari in datetime
+            dati_puliti = {}
+            for data_str, tavoli in dati.items():
+                dati_puliti[data_str] = {}
+                for nome, info in tavoli.items():
+                    dati_puliti[data_str][nome] = {
+                        "stato": info["stato"],
+                        "fino_a": datetime.fromisoformat(info["fino_a"]) if info["fino_a"] else None,
+                        "max_cap": info["max_cap"],
+                        "cliente": info.get("cliente", ""),
+                        "tel": info.get("tel", "")
+                    }
+            return dati_puliti
+    return {}
 
-def salva_bord(bord_dict):
+def salva_bord(dati_totali):
     dati_da_salvare = {}
-    for nome, info in bord_dict.items():
-        dati_da_salvare[nome] = {
-            "stato": info["stato"],
-            "fino_a": info["fino_a"].isoformat() if info["fino_a"] else None,
-            "max_cap": info["max_cap"],
-            "cliente": info.get("cliente", ""),
-            "tel": info.get("tel", "")
-        }
+    for data_str, tavoli in dati_totali.items():
+        dati_da_salvare[data_str] = {}
+        for nome, info in tavoli.items():
+            dati_da_salvare[data_str][nome] = {
+                "stato": info["stato"],
+                "fino_a": info["fino_a"].isoformat() if info["fino_a"] else None,
+                "max_cap": info["max_cap"],
+                "cliente": info.get("cliente", ""),
+                "tel": info.get("tel", "")
+            }
     with open(DB_FILE, "w") as f:
         json.dump(dati_da_salvare, f)
 
-bord_attuali = carica_bord()
+dati_generali = carica_bord()
 
-oggi = datetime.now()
-if oggi.strftime("%A") == "Monday":
-    st.error("🚨 Idag ar det mandag: restaurangen ar STANGD.")
+# 1. SELEZIONE DELLA DATA DA PARTE DEL CAMERIERE
+st.header("📆 Välj datum för bokning")
+oggi_completo = datetime.now()
+data_selezionata = st.date_input("Välj dag:", value=oggi_completo.date())
+data_chiave = data_selezionata.isoformat()
+
+# Controllo Lunedì Chiuso per la data selezionata
+if data_selezionata.strftime("%A") == "Monday":
+    st.error("🚨 Det valda datumet är en måndag: restaurangen är STÄNGD.")
     st.stop()
 
-cambiato = False
-for nome, dati in list(bord_attuali.items()):
-    if dati["stato"] == "Occupato" and dati["fino_a"] and oggi > dati["fino_a"]:
-        bord_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
-        cambiato = True
-if cambiato:
-    salva_bord(bord_attuali)
+# Se la data non esiste ancora nel database, crea una sala vuota da 10 tavoli per quel giorno
+if data_chiave not in dati_generali:
+    sala_giorno = {f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 2, "cliente": "", "tel": ""} for i in range(1, 4)}
+    sala_giorno.update({f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 4, "cliente": "", "tel": ""} for i in range(4, 11)})
+    dati_generali[data_chiave] = sala_giorno
+    salva_bord(dati_generali)
 
-# NY BOKNING PANEL
+bord_attuali = dati_generali[data_chiave]
+
+# Auto-pulizia dei tavoli scaduti (funziona solo se visualizziamo il giorno di oggi)
+if data_selezionata == oggi_completo.date():
+    cambiato = False
+    for nome, dati in list(bord_attuali.items()):
+        if dati["stato"] == "Occupato" and dati["fino_a"] and oggi_completo > dati["fino_a"]:
+            bord_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
+            cambiato = True
+    if cambiato:
+        dati_generali[data_chiave] = bord_attuali
+        salva_bord(dati_generali)
+
+# 2. PANNELLO NUOVA PRENOTAZIONE
 st.header("📌 Registrera ny bokning")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -59,7 +86,7 @@ with col2:
 with col3:
     persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2)
 with col4:
-    orario_scelta = st.time_input("Ankomsttid", value=oggi.time())
+    orario_scelta = st.time_input("Ankomsttid", value=oggi_completo.time())
 
 bord_disponibili = []
 if persone <= 2:
@@ -75,9 +102,11 @@ if bord_disponibili:
         if not cognome:
             st.error("⚠️ Vanligen fyll i kundens efternamn innan du sparar.")
         else:
-            ora_inizio = datetime.combine(oggi.date(), orario_scelta)
-            if ora_inizio < oggi:
-                ora_inizio = oggi
+            ora_inizio = datetime.combine(data_selezionata, orario_scelta)
+            
+            # Se è oggi ed inseriscono un orario passato, imposta l'ora attuale
+            if data_selezionata == oggi_completo.date() and ora_inizio < oggi_completo:
+                ora_inizio = oggi_completo
                 
             bord_attuali[bord_scelto] = {
                 "stato": "Occupato",
@@ -86,8 +115,9 @@ if bord_disponibili:
                 "cliente": cognome,
                 "tel": telefono
             }
-            salva_bord(bord_attuali)
-            st.success(f"✅ Bokning klar! {bord_scelto} har tilldelats till {cognome}")
+            dati_generali[data_chiave] = bord_attuali
+            salva_bord(dati_generali)
+            st.success(f"✅ Bokning klar! {bord_scelto} har tilldelats till {cognome} den {data_selezionata.strftime('%d/%m')}")
             st.rerun()
 else:
     if persone <= 2:
@@ -95,8 +125,8 @@ else:
     else:
         st.error("❌ Inga 4-mansbord ar tillgangliga just nu.")
 
-# MATTSALENS STATUS
-st.header("🪟 Matsalens status i realtid")
+# 3. STATO DELLA SALA PER IL GIORNO SELEZIONATO
+st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')}")
 
 for nome, dati in bord_attuali.items():
     col_bord, col_azione = st.columns(2)
@@ -104,7 +134,6 @@ for nome, dati in bord_attuali.items():
     
     with col_bord:
         if dati["stato"] == "Libero":
-            # Nome tavolo GIALLO e grande (#FFD166), il resto testo normale
             st.markdown(
                 f"🟢 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
                 f"({cap_testo}) | TILLGÄNGLIGT", 
@@ -114,15 +143,14 @@ for nome, dati in bord_attuali.items():
             ora_fine = dati["fino_a"].strftime("%H:%M")
             info_cliente = f"Gäst: {dati.get('cliente', '')} ({dati.get('tel', '')})"
             
-            tempo_rimasto = dati["fino_a"] - datetime.now()
-            minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
-            
-            if minuti_rimasti > 0:
-                countdown_testo = f"⏳ {minuti_rimasti} min återstår"
+            # Calcolo del conto alla rovescia (ha senso visivo solo se guardiamo la giornata di oggi)
+            if data_selezionata == oggi_completo.date():
+                tempo_rimasto = dati["fino_a"] - datetime.now()
+                minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
+                countdown_testo = f"⏳ {minuti_rimasti} min återstår" if minuti_rimasti > 0 else "⏳ Tiden har gått ut!"
             else:
-                countdown_testo = "⏳ Tiden har gått ut!"
+                countdown_testo = f"⏱️ Bokad till {ora_fine}"
                 
-            # Nome tavolo GIALLO e grande (#FFD166), il resto testo normale occupato
             st.markdown(
                 f"🔴 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
                 f"({cap_testo}) | UPPTAGET | Sluttid: {ora_fine} | **{countdown_testo}**", 
@@ -133,6 +161,7 @@ for nome, dati in bord_attuali.items():
     with col_azione:
         if dati["stato"] == "Occupato" and st.button("Frigör bord", key=nome):
             bord_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
-            salva_bord(bord_attuali)
+            dati_generali[data_chiave] = bord_attuali
+            salva_bord(dati_generali)
             st.rerun()
     st.markdown("<hr style='margin: 8px 0; border: 0.5px solid #333;'>", unsafe_allow_html=True)
