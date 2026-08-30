@@ -1,4 +1,3 @@
-
 import streamlit as st
 from datetime import datetime, timedelta
 import json
@@ -23,7 +22,7 @@ def carica_tavoli():
 
 def salva_tavoli(tavoli):
     dati_da_salvare = {}
-    for nome, info in dati.items():
+    for nome, info in tavoli.items():
         dati_da_salvare[nome] = {
             "stato": info["stato"],
             "fino_a": info["fino_a"].isoformat() if info["fino_a"] else None,
@@ -41,7 +40,6 @@ if oggi.strftime("%A") == "Monday":
     st.error("Oggi e Lunedi: il ristorante e CHIUSO.")
     st.stop()
 
-# Auto-pulizia se il countdown e scaduto
 cambiato = False
 for nome, dati in list(tavoli_attuali.items()):
     if dati["stato"] == "Occupato" and dati["fino_a"] and oggi > dati["fino_a"]:
@@ -77,7 +75,6 @@ if tavoli_disponibili:
         else:
             ora_inizio = datetime.combine(oggi.date(), orario_scelta)
             
-            # Se la prenotazione e per adesso, calcola i 120 minuti da ora
             if ora_inizio < oggi:
                 ora_inizio = oggi
                 
@@ -108,7 +105,6 @@ for nome, dati in tavoli_attuali.items():
             ora_fine = dati["fino_a"].strftime("%H:%M")
             info_cliente = f"Clienti: {dati.get('cliente', '')} ({dati.get('tel', '')})"
             
-            # Calcolo del Count Down in minuti rimasti
             tempo_rimasto = dati["fino_a"] - datetime.now()
             minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
             
@@ -124,3 +120,4 @@ for nome, dati in tavoli_attuali.items():
             tavoli_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
             salva_tavoli(tavoli_attuali)
             st.rerun()
+
