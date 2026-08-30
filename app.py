@@ -1,3 +1,4 @@
+
 import streamlit as st
 from datetime import datetime, timedelta
 import json
@@ -22,7 +23,7 @@ def carica_tavoli():
 
 def salva_tavoli(tavoli):
     dati_da_salvare = {}
-    for nome, info in tavoli.items():
+    for nome, info in dati.items():
         dati_da_salvare[nome] = {
             "stato": info["stato"],
             "fino_a": info["fino_a"].isoformat() if info["fino_a"] else None,
@@ -40,6 +41,7 @@ if oggi.strftime("%A") == "Monday":
     st.error("Oggi e Lunedi: il ristorante e CHIUSO.")
     st.stop()
 
+# Auto-pulizia se il countdown e scaduto
 cambiato = False
 for nome, dati in list(tavoli_attuali.items()):
     if dati["stato"] == "Occupato" and dati["fino_a"] and oggi > dati["fino_a"]:
@@ -60,14 +62,12 @@ with col3:
 with col4:
     orario_scelta = st.time_input("Orario Arrivo", value=oggi.time())
 
-# Filtra i tavoli idonei e liberi in base al numero di persone selezionato
 tavoli_disponibili = []
 if persone <= 2:
     tavoli_disponibili = [nome for nome, dati in tavoli_attuali.items() if dati["max_cap"] == 2 and dati["stato"] == "Libero"]
 else:
     tavoli_disponibili = [nome for nome, dati in tavoli_attuali.items() if dati["max_cap"] == 4 and dati["stato"] == "Libero"]
 
-# Mostra la scelta manuale del tavolo
 if tavoli_disponibili:
     tavolo_scelto = st.selectbox("Scegli il tavolo da assegnare:", tavoli_disponibili)
     
@@ -76,24 +76,24 @@ if tavoli_disponibili:
             st.error("Inserisci il cognome del cliente prima di salvare.")
         else:
             ora_inizio = datetime.combine(oggi.date(), orario_scelta)
-            ora = orario_scelta.hour
             
-            if not ((1 <= ora < 15) or (16 <= ora < 22)):
-                st.warning("Orario fuori dalle fasce di apertura (1-15 o 16-22).")
-            else:
-                tavoli_attuali[tavolo_scelto] = {
-                    "stato": "Occupato",
-                    "fino_a": ora_inizio + timedelta(minutes=120),
-                    "max_cap": tavoli_attuali[tavolo_scelto]["max_cap"],
-                    "cliente": cognome,
-                    "tel": telefono
-                }
-                salva_tavoli(tavoli_attuali)
-                st.success(f"Telefono registrato! Assegnato il **{tavolo_scelto}** a Sig. {cognome}")
-                st.rerun()
+            # Se la prenotazione e per adesso, calcola i 120 minuti da ora
+            if ora_inizio < oggi:
+                ora_inizio = oggi
+                
+            tavoli_attuali[tavolo_scelto] = {
+                "stato": "Occupato",
+                "fino_a": ora_inizio + timedelta(minutes=120),
+                "max_cap": tavoli_attuali[tavolo_scelto]["max_cap"],
+                "cliente": cognome,
+                "tel": telefono
+            }
+            salva_tavoli(tavoli_attuali)
+            st.success(f"Telefono registrato! Assegnato il **{tavolo_scelto}** a Sig. {cognome}")
+            st.rerun()
 else:
     if persone <= 2:
-        st.warning("⚠️ Tutti i tavoli da 2 sono occupati! (Regola: Non puoi scegliere un tavolo da 4 per sole 2 persone).")
+        st.warning("⚠️ Tutti i tavoli da 2 sono occupati! Non puoi usare un tavolo da 4 per 2 persone.")
     else:
         st.error("❌ Nessun tavolo da 4 disponibile al momento.")
 
@@ -107,7 +107,17 @@ for nome, dati in tavoli_attuali.items():
         else:
             ora_fine = dati["fino_a"].strftime("%H:%M")
             info_cliente = f"Clienti: {dati.get('cliente', '')} ({dati.get('tel', '')})"
-            st.error(f"**{nome}** | **OCCUPATO** fino alle {ora_fine} | {info_cliente}")
+            
+            # Calcolo del Count Down in minuti rimasti
+            tempo_rimasto = dati["fino_a"] - datetime.now()
+            minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
+            
+            if minuti_rimasti > 0:
+                countdown_testo = f"⏳ Mancano {minuti_rimasti} minuti al rilascio"
+            else:
+                countdown_testo = "⏳ Tempo scaduto!"
+                
+            st.error(f"**{nome}** | **OCCUPATO** fino alle {ora_fine} | {info_cliente} | {countdown_testo}")
             
     with col_azione:
         if dati["stato"] == "Occupato" and st.button("Libera Subito", key=nome):
