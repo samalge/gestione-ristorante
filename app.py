@@ -1,172 +1,95 @@
 import streamlit as st
-from datetime import datetime, timedelta, date, time
 import json
 import os
 
-st.set_page_config(page_title="Bordshantering Restaurang", layout="wide")
-st.title("Centralen: Telefonbokning")
+st.set_page_config(page_title="Gestione Magazzino", layout="wide")
+st.title("📦 Magazzino & Dispensa Ristorante")
 
-DB_FILE = "stato_bord.json"
+DB_FILE = "stato_magazzino.json"
 
-def carica_bord():
+def carica_magazzino():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
-                dati = json.load(f)
-            
-            # Se il file contiene ancora la vecchia struttura (senza date come chiavi)
-            # lo resettiamo per evitare il crash
-            if dati and "Bord 1" in dati:
-                return {}
-                
-            dati_puliti = {}
-            for data_str, tavoli in dati.items():
-                dati_puliti[data_str] = {}
-                for nome, info in tavoli.items():
-                    dati_puliti[data_str][nome] = {
-                        "stato": info["stato"],
-                        "fino_a": datetime.fromisoformat(info["fino_a"]) if info["fino_a"] else None,
-                        "max_cap": info["max_cap"],
-                        "cliente": info.get("cliente", ""),
-                        "tel": info.get("tel", "")
-                    }
-            return dati_puliti
-        except Exception:
+                return json.load(f)
+        except:
             return {}
-    return {}
+    # Prodotti iniziali di esempio (puoi modificarli o cancellarli direttamente dall'app)
+    return {
+        "101": {"nome": "Pasta Barilla", "scorta": 20, "soglia_minima": 5},
+        "102": {"nome": "Polpa di Pomodoro", "scorta": 50, "soglia_minima": 10},
+        "103": {"nome": "Vino Rosso della Casa", "scorta": 12, "soglia_minima": 3}
+    }
 
-def salva_bord(dati_totali):
-    dati_da_salvare = {}
-    for data_str, tavoli in dati_totali.items():
-        dati_da_salvare[data_str] = {}
-        for nome, info in tavoli.items():
-            dati_da_salvare[data_str][nome] = {
-                "stato": info["stato"],
-                "fino_a": info["fino_a"].isoformat() if info["fino_a"] else None,
-                "max_cap": info["max_cap"],
-                "cliente": info.get("cliente", ""),
-                "tel": info.get("tel", "")
-            }
+def salva_magazzino(inventario):
     with open(DB_FILE, "w") as f:
-        json.dump(dati_da_salvare, f)
+        json.dump(inventario, f)
 
-dati_generali = carica_bord()
+inventario = carica_magazzino()
 
-# 1. SELEZIONE DELLA DATA
-st.header("📆 Välj datum för bokning")
-oggi_completo = datetime.now()
-data_selezionata = st.date_input("Välj dag:", value=oggi_completo.date())
-data_chiave = data_selezionata.isoformat()
+# BARRA LATERALE: CARICO MERCI (Arrivo Fornitori)
+st.sidebar.header("🚚 Carico Merci (Arrivo Fornitori)")
+nuovo_codice = st.sidebar.text_input("Codice Prodotto / Codice a Barre:", placeholder="es. 104 o scansiona")
+nuovo_nome = st.sidebar.text_input("Nome Prodotto:", placeholder="es. Mozzarella")
+quantita_carico = st.sidebar.number_input("Quantità da aggiungere:", min_value=1, value=10)
+soglia_allerta = st.sidebar.number_input("Scorta minima di allerta:", min_value=1, value=5)
 
-# Controllo Lunedì Chiuso
-if data_selezionata.strftime("%A") == "Monday":
-    st.error("🚨 Det valda datumet är en måndag: restaurangen är STÄNGD.")
-    st.stop()
-
-# Crea sala vuota per il giorno se non esiste
-if data_chiave not in dati_generali:
-    sala_giorno = {f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 2, "cliente": "", "tel": ""} for i in range(1, 4)}
-    sala_giorno.update({f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 4, "cliente": "", "tel": ""} for i in range(4, 11)})
-    dati_generali[data_chiave] = sala_giorno
-    salva_bord(dati_generali)
-
-bord_attuali = dati_generali[data_chiave]
-
-# Auto-pulizia se guardiamo oggi
-if data_selezionata == oggi_completo.date():
-    cambiato = False
-    for nome, dati in list(bord_attuali.items()):
-        if dati["stato"] == "Occupato" and dati["fino_a"] and oggi_completo > dati["fino_a"]:
-            bord_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
-            cambiato = True
-    if cambiato:
-        dati_generali[data_chiave] = bord_attuali
-        salva_bord(dati_generali)
-
-# 2. PANNELLO NUOVA PRENOTAZIONE
-st.header("📌 Registrera ny bokning")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    cognome = st.text_input("Kundens efternamn", placeholder="t.ex. Rossi").strip()
-with col2:
-    telefono = st.text_input("Telefonnummer", placeholder="t.ex. 076123456")
-with col3:
-    persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2)
-with col4:
-    orario_scelta = st.time_input("Ankomsttid", value=oggi_completo.time())
-
-bord_disponibili = []
-if persone <= 2:
-    bord_disponibili = [f"{nome} (2 pers)" for nome, dati in bord_attuali.items() if dati["max_cap"] == 2 and dati["stato"] == "Libero"]
-else:
-    bord_disponibili = [f"{nome} (4 pers)" for nome, dati in bord_attuali.items() if dati["max_cap"] == 4 and dati["stato"] == "Libero"]
-
-if bord_disponibili:
-    bord_scelto_completo = st.selectbox("Valj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrae "Bord X" correttamente
-    
-    if st.button("Boka valt bord"):
-        if not cognome:
-            st.error("⚠️ Vanligen fyll i kundens efternamn innan du sparar.")
-        else:
-            ora_inizio = datetime.combine(data_selezionata, orario_scelta)
-            if data_selezionata == oggi_completo.date() and ora_inizio < oggi_completo:
-                ora_inizio = oggi_completo
-                
-            bord_attuali[bord_scelto] = {
-                "stato": "Occupato",
-                "fino_a": ora_inizio + timedelta(minutes=120),
-                "max_cap": bord_attuali[bord_scelto]["max_cap"],
-                "cliente": cognome,
-                "tel": telefono
-            }
-            dati_generali[data_chiave] = bord_attuali
-            salva_bord(dati_generali)
-            st.success(f"✅ Bokning klar! {bord_scelto} har tilldelats till {cognome} den {data_selezionata.strftime('%d/%m')}")
-            st.rerun()
-else:
-    if persone <= 2:
-        st.warning("⚠️ Alla 2-mansbord ar upptagna! (Regel: Du far inte valja ett 4-mansbord for endast 2 personer).")
+if st.sidebar.button("Registra e Aggiungi al Magazzino"):
+    if not nuovo_codice or not nuovo_nome:
+        st.sidebar.error("Devi inserire sia il codice che il nome del prodotto!")
     else:
-        st.error("❌ Inga 4-mansbord ar tillgangliga just nu.")
-
-# 3. STATO DELLA SALA
-st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')}")
-
-for nome, dati in bord_attuali.items():
-    col_bord, col_azione = st.columns(2)
-    cap_testo = "2 pers" if dati["max_cap"] == 2 else "4 pers"
-    
-    with col_bord:
-        if dati["stato"] == "Libero":
-            st.markdown(
-                f"🟢 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
-                f"({cap_testo}) | TILLGÄNGLIGT", 
-                unsafe_allow_html=True
-            )
+        if nuovo_codice in inventario:
+            inventario[nuovo_codice]["scorta"] += quantita_carico
         else:
-            ora_fine = dati["fino_a"].strftime("%H:%M")
-            info_cliente = f"Gäst: {dati.get('cliente', '')} ({dati.get('tel', '')})"
-            
-            if data_selezionata == oggi_completo.date():
-                tempo_rimasto = dati["fino_a"] - datetime.now()
-                minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
-                countdown_testo = f"⏳ {minuti_rimasti} min återstår" if minuti_rimasti > 0 else "⏳ Tiden har gått ut!"
-            else:
-                countdown_testo = f"⏱️ Bokad till {ora_fine}"
-                
-            st.markdown(
-                f"🔴 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> "
-                f"({cap_testo}) | UPPTAGET | Sluttid: {ora_fine} | **{countdown_testo}**", 
-                unsafe_allow_html=True
-            )
-            st.write(f"👉 {info_cliente}")
-            
-    with col_azione:
-        if dati["stato"] == "Occupato" and st.button("Frigör bord", key=nome):
-            bord_attuali[nome] = {"stato": "Libero", "fino_a": None, "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
-            dati_generali[data_chiave] = bord_attuali
-            salva_bord(dati_generali)
+            inventario[nuovo_codice] = {"nome": nuovo_nome, "scorta": quantita_carico, "soglia_minima": soglia_allerta}
+        salva_magazzino(inventario)
+        st.sidebar.success(f"Registrato! Aggiunti {quantita_carico} pz di {nuovo_nome}.")
+        st.rerun()
+
+
+# PANNELLO CENTRALE: SCARICO RAPIDO (Cucina / Bar)
+st.header("🛒 Scarico Rapido (Uscita merci per la cucina)")
+col_scan, col_quantita = st.columns(2)
+
+with col_scan:
+    codice_prelievo = st.text_input("Scansiona codice a barre o digita il codice prodotto:", key="scan", placeholder="Posiziona il cursore qui")
+with col_quantita:
+    quantita_prelievo = st.number_input("Quantità da prelevare:", min_value=1, value=1, key="qta")
+
+if st.button("🔄 Conferma Prelievo", use_container_width=True):
+    if codice_prelievo in inventario:
+        if inventario[codice_prelievo]["scorta"] >= quantita_prelievo:
+            inventario[codice_prelievo]["scorta"] -= quantita_prelievo
+            salva_magazzino(inventario)
+            st.success(f"Prelevati {quantita_prelievo} pz di **{inventario[codice_prelievo]['nome']}**!")
             st.rerun()
+        else:
+            st.error(f"Scorte insufficienti! Hai solo {inventario[codice_prelievo]['scorta']} pz in magazzino.")
+    else:
+        st.error("Codice prodotto non trovato nel database!")
+
+
+# INVENTARIO IN TEMPO REALE
+st.header("📊 Inventario in Tempo Reale")
+
+for codice, info in list(inventario.items()):
+    col_info, col_azioni = st.columns(2)
+    scorta_attuale = info["scorta"]
+    soglia = info["soglia_minima"]
+    
+    with col_info:
+        if scorta_attuale <= soglia:
+            # Allerta rossa se il prodotto sta per finire sotto la soglia minima
+            st.error(f"🚨 **[{codice}] {info['nome']}** | In Magazzino: **{scorta_attuale}** pz (Sotto la scorta minima di {soglia} pz!)")
+        else:
+            st.info(f"📦 **[{codice}] {info['nome']}** | In Magazzino: **{scorta_attuale}** pz")
+            
+    with col_azioni:
+        # Pulsante rapido per eliminare 1 pezzo (es. se scade o si rompe una bottiglia)
+        if st.button("Elimina 1 pz", key=f"del_{codice}"):
+            if inventario[codice]["scorta"] > 0:
+                inventario[codice]["scorta"] -= 1
+                salva_magazzino(inventario)
+                st.rerun()
     st.markdown("<hr style='margin: 8px 0; border: 0.5px solid #333;'>", unsafe_allow_html=True)
+
