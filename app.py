@@ -10,9 +10,15 @@ DB_FILE = "stato_bord.json"
 
 def carica_bord():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            dati = json.load(f)
-            # Riconverte le chiavi delle date da stringhe a oggetti data e gli orari in datetime
+        try:
+            with open(DB_FILE, "r") as f:
+                dati = json.load(f)
+            
+            # Se il file contiene ancora la vecchia struttura (senza date come chiavi)
+            # lo resettiamo per evitare il crash
+            if dati and "Bord 1" in dati:
+                return {}
+                
             dati_puliti = {}
             for data_str, tavoli in dati.items():
                 dati_puliti[data_str] = {}
@@ -25,6 +31,8 @@ def carica_bord():
                         "tel": info.get("tel", "")
                     }
             return dati_puliti
+        except Exception:
+            return {}
     return {}
 
 def salva_bord(dati_totali):
@@ -44,18 +52,18 @@ def salva_bord(dati_totali):
 
 dati_generali = carica_bord()
 
-# 1. SELEZIONE DELLA DATA DA PARTE DEL CAMERIERE
+# 1. SELEZIONE DELLA DATA
 st.header("📆 Välj datum för bokning")
 oggi_completo = datetime.now()
 data_selezionata = st.date_input("Välj dag:", value=oggi_completo.date())
 data_chiave = data_selezionata.isoformat()
 
-# Controllo Lunedì Chiuso per la data selezionata
+# Controllo Lunedì Chiuso
 if data_selezionata.strftime("%A") == "Monday":
     st.error("🚨 Det valda datumet är en måndag: restaurangen är STÄNGD.")
     st.stop()
 
-# Se la data non esiste ancora nel database, crea una sala vuota da 10 tavoli per quel giorno
+# Crea sala vuota per il giorno se non esiste
 if data_chiave not in dati_generali:
     sala_giorno = {f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 2, "cliente": "", "tel": ""} for i in range(1, 4)}
     sala_giorno.update({f"Bord {i}": {"stato": "Libero", "fino_a": None, "max_cap": 4, "cliente": "", "tel": ""} for i in range(4, 11)})
@@ -64,7 +72,7 @@ if data_chiave not in dati_generali:
 
 bord_attuali = dati_generali[data_chiave]
 
-# Auto-pulizia dei tavoli scaduti (funziona solo se visualizziamo il giorno di oggi)
+# Auto-pulizia se guardiamo oggi
 if data_selezionata == oggi_completo.date():
     cambiato = False
     for nome, dati in list(bord_attuali.items()):
@@ -96,15 +104,13 @@ else:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Valj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrae correttamente "Bord X"
+    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrae "Bord X" correttamente
     
     if st.button("Boka valt bord"):
         if not cognome:
             st.error("⚠️ Vanligen fyll i kundens efternamn innan du sparar.")
         else:
             ora_inizio = datetime.combine(data_selezionata, orario_scelta)
-            
-            # Se è oggi ed inseriscono un orario passato, imposta l'ora attuale
             if data_selezionata == oggi_completo.date() and ora_inizio < oggi_completo:
                 ora_inizio = oggi_completo
                 
@@ -125,7 +131,7 @@ else:
     else:
         st.error("❌ Inga 4-mansbord ar tillgangliga just nu.")
 
-# 3. STATO DELLA SALA PER IL GIORNO SELEZIONATO
+# 3. STATO DELLA SALA
 st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')}")
 
 for nome, dati in bord_attuali.items():
@@ -143,7 +149,6 @@ for nome, dati in bord_attuali.items():
             ora_fine = dati["fino_a"].strftime("%H:%M")
             info_cliente = f"Gäst: {dati.get('cliente', '')} ({dati.get('tel', '')})"
             
-            # Calcolo del conto alla rovescia (ha senso visivo solo se guardiamo la giornata di oggi)
             if data_selezionata == oggi_completo.date():
                 tempo_rimasto = dati["fino_a"] - datetime.now()
                 minuti_rimasti = int(tempo_rimasto.total_seconds() / 60)
