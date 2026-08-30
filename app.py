@@ -102,7 +102,7 @@ if st.button("Assegna Tavolo al Cliente"):
 
 st.header("Situazione Sala")
 for nome, dati in tavoli_attuali.items():
-    col_tavolo, col_azione = st.columns()
+    col_tavolo, col_azione = st.columns(2)
     
     with col_tavolo:
         if dati["stato"] == "Libero":
