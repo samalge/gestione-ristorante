@@ -1,9 +1,10 @@
+```python
 import streamlit as st
 from datetime import datetime, time
 import json
 import os
-import copy
 import shutil
+import hmac
 
 # ============================================================
 # CONFIGURAZIONE
@@ -19,6 +20,9 @@ st.title("📞 Centralino: Prenotazioni Telefoniche")
 DB_FILE = "stato_bord.json"
 BACKUP_FILE = "stato_bord_backup.json"
 
+# Password per il reset del database
+RESET_PASSWORD = "Samuelmark123#"
+
 
 # ============================================================
 # DATABASE
@@ -30,12 +34,22 @@ def carica_database():
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 dati = json.load(f)
 
-                # Compatibilità con il vecchio database
-                for chiave, valore in dati.items():
-                    if "stato" not in valore:
-                        valore["stato"] = "Prenotato"
+            # Compatibilità con il vecchio database
+            for chiave, valore in dati.items():
 
-                return dati
+                if "persone" not in valore:
+                    valore["persone"] = 2
+
+                if "stato" not in valore:
+                    valore["stato"] = "Prenotato"
+
+                if "note" not in valore:
+                    valore["note"] = ""
+
+                if "tel" not in valore:
+                    valore["tel"] = ""
+
+            return dati
 
         except Exception:
             return {}
@@ -44,7 +58,7 @@ def carica_database():
 
 
 def salva_database(db):
-    # Backup prima di sovrascrivere il database
+    # Backup automatico prima di modificare
     if os.path.exists(DB_FILE):
         try:
             shutil.copy2(DB_FILE, BACKUP_FILE)
@@ -52,41 +66,33 @@ def salva_database(db):
             pass
 
     with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=4, ensure_ascii=False)
+        json.dump(
+            db,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
 
 
 db_prenotazioni = carica_database()
 
 
 # ============================================================
-# FUNZIONI UTILI
+# FUNZIONI
 # ============================================================
 
-def formatta_turno(turno):
-    return turno
+def tavolo_compatibile(tavolo, persone, mappa_tavoli):
 
+    capienza = mappa_tavoli[tavolo]
 
-def conta_persone(db, data_prefix=None):
-    totale = 0
+    if persone <= 2:
+        return capienza == 2
 
-    for chiave, dati in db.items():
-
-        if data_prefix and not chiave.startswith(data_prefix):
-            continue
-
-        # Recupera il numero di persone.
-        # Compatibilità con vecchie prenotazioni senza questo dato.
-        persone = dati.get("persone", 2)
-
-        try:
-            totale += int(persone)
-        except Exception:
-            totale += 2
-
-    return totale
+    return capienza == 4
 
 
 def prenotazioni_giornaliere(db, data_prefix):
+
     risultato = []
 
     for chiave, dati in db.items():
@@ -101,6 +107,7 @@ def prenotazioni_giornaliere(db, data_prefix):
 
         risultato.append({
             "chiave": chiave,
+            "data": parti[0],
             "turno": parti[1],
             "tavolo": parti[2],
             "cliente": dati.get("cliente", ""),
@@ -114,6 +121,7 @@ def prenotazioni_giornaliere(db, data_prefix):
 
 
 def trova_prenotazioni(db, ricerca):
+
     risultati = []
 
     ricerca = ricerca.lower().strip()
@@ -123,8 +131,13 @@ def trova_prenotazioni(db, ricerca):
 
     for chiave, dati in db.items():
 
-        cliente = str(dati.get("cliente", "")).lower()
-        telefono = str(dati.get("tel", "")).lower()
+        cliente = str(
+            dati.get("cliente", "")
+        ).lower()
+
+        telefono = str(
+            dati.get("tel", "")
+        ).lower()
 
         if ricerca in cliente or ricerca in telefono:
 
@@ -144,18 +157,35 @@ def trova_prenotazioni(db, ricerca):
                     "stato": dati.get("stato", "Prenotato")
                 })
 
-    risultati.sort(key=lambda x: (x["data"], x["turno"]))
+    risultati.sort(
+        key=lambda x: (x["data"], x["turno"])
+    )
 
     return risultati
 
 
-def tavolo_compatibile(tavolo, persone, mappa_tavoli):
-    capienza = mappa_tavoli[tavolo]
+def conteggio_periodo(db, prefisso):
 
-    if persone <= 2:
-        return capienza == 2
+    prenotazioni = 0
+    persone = 0
 
-    return capienza == 4
+    for chiave, dati in db.items():
+
+        if chiave.startswith(prefisso):
+
+            if dati.get("stato", "Prenotato") == "Cancellato":
+                continue
+
+            prenotazioni += 1
+
+            try:
+                persone += int(
+                    dati.get("persone", 2)
+                )
+            except Exception:
+                persone += 2
+
+    return prenotazioni, persone
 
 
 # ============================================================
@@ -276,113 +306,379 @@ for i in range(4, 11):
 
 
 # ============================================================
+# SESSION STATE
+# ============================================================
+
+if "pre_turno" not in st.session_state:
+    st.session_state["pre_turno"] = None
+
+if "pre_tavolo" not in st.session_state:
+    st.session_state["pre_tavolo"] = None
+
+if "reset_autorizzato" not in st.session_state:
+    st.session_state["reset_autorizzato"] = False
+
+
+# ============================================================
 # SIDEBAR
 # ============================================================
 
 st.sidebar.header("📊 Riepilogo")
 
 oggi_dt = datetime.now()
-data_oggi_stringa = oggi_dt.date().isoformat()
+oggi_stringa = oggi_dt.date().isoformat()
 
-prefisso_mese = oggi_dt.strftime("%Y-%m")
-prefisso_anno = oggi_dt.strftime("%Y-")
+mese_corrente = oggi_dt.strftime("%Y-%m")
+anno_corrente = oggi_dt.strftime("%Y")
 
-totale_giorno = 0
-totale_mese = 0
-totale_anno = 0
+oggi_prenotazioni, oggi_persone = conteggio_periodo(
+    db_prenotazioni,
+    oggi_stringa
+)
 
-persone_giorno = 0
-persone_mese = 0
-persone_anno = 0
+mese_prenotazioni, mese_persone = conteggio_periodo(
+    db_prenotazioni,
+    mese_corrente
+)
 
-for chiave_db, dati in db_prenotazioni.items():
-
-    persone = dati.get("persone", 2)
-
-    try:
-        persone = int(persone)
-    except Exception:
-        persone = 2
-
-    if chiave_db.startswith(data_oggi_stringa):
-        totale_giorno += 1
-        persone_giorno += persone
-
-    if chiave_db.startswith(prefisso_mese):
-        totale_mese += 1
-        persone_mese += persone
-
-    if chiave_db.startswith(prefisso_anno):
-        totale_anno += 1
-        persone_anno += persone
-
+anno_prenotazioni, anno_persone = conteggio_periodo(
+    db_prenotazioni,
+    anno_corrente
+)
 
 st.sidebar.metric(
     "📆 Prenotazioni oggi",
-    totale_giorno
+    oggi_prenotazioni
 )
 
 st.sidebar.metric(
     "👥 Persone oggi",
-    persone_giorno
+    oggi_persone
 )
 
 st.sidebar.metric(
     "🗓️ Prenotazioni questo mese",
-    totale_mese
+    mese_prenotazioni
 )
 
 st.sidebar.metric(
     "👥 Persone questo mese",
-    persone_mese
+    mese_persone
 )
 
 st.sidebar.metric(
     "👑 Prenotazioni quest'anno",
-    totale_anno
+    anno_prenotazioni
 )
 
-st.sidebar.markdown(
-    "<hr style='margin: 15px 0; border: 0.5px solid #444;'>",
-    unsafe_allow_html=True
+st.sidebar.metric(
+    "👥 Persone quest'anno",
+    anno_persone
 )
 
 
 # ============================================================
-# RESET DATABASE
+# ARCHIVIO
 # ============================================================
 
-st.sidebar.header("🛠️ Strumenti di Sistema")
+st.sidebar.markdown("---")
 
-if st.sidebar.button(
-    "⚠️ RESETTA DATABASE",
-    help="Cancella tutte le prenotazioni"
-):
+st.sidebar.header("📚 Archivio Prenotazioni")
 
-    if os.path.exists(DB_FILE):
+tipo_archivio = st.sidebar.radio(
+    "Visualizza per:",
+    [
+        "Giorno",
+        "Mese",
+        "Anno"
+    ]
+)
 
-        try:
-            shutil.copy2(DB_FILE, BACKUP_FILE)
-        except Exception:
-            pass
 
-        os.remove(DB_FILE)
+# ------------------------------------------------------------
+# DATE DISPONIBILI NEL DATABASE
+# ------------------------------------------------------------
 
-        st.sidebar.success(
-            "✅ Database resettato!"
+date_database = sorted(
+    list(
+        set(
+            chiave.split("|")[0]
+            for chiave in db_prenotazioni.keys()
+            if "|" in chiave
+        )
+    ),
+    reverse=True
+)
+
+
+# ------------------------------------------------------------
+# ARCHIVIO GIORNO
+# ------------------------------------------------------------
+
+if tipo_archivio == "Giorno":
+
+    if date_database:
+
+        data_archivio_stringa = st.sidebar.selectbox(
+            "Seleziona giorno:",
+            date_database
+        )
+
+        risultati_archivio = [
+            p for p in prenotazioni_giornaliere(
+                db_prenotazioni,
+                data_archivio_stringa
+            )
+        ]
+
+        st.sidebar.caption(
+            f"📅 {data_archivio_stringa}"
+        )
+
+        st.sidebar.write(
+            f"Prenotazioni: {len(risultati_archivio)}"
+        )
+
+        st.sidebar.write(
+            "Persone: "
+            + str(
+                sum(
+                    int(p["persone"])
+                    for p in risultati_archivio
+                    if p["stato"] != "Cancellato"
+                )
+            )
         )
 
     else:
 
+        data_archivio_stringa = None
+
         st.sidebar.info(
-            "Il database è già vuoto."
+            "Nessuna prenotazione archiviata."
         )
 
-    st.rerun()
+
+# ------------------------------------------------------------
+# ARCHIVIO MESE
+# ------------------------------------------------------------
+
+elif tipo_archivio == "Mese":
+
+    mesi_database = sorted(
+        list(
+            set(
+                chiave.split("|")[0][:7]
+                for chiave in db_prenotazioni.keys()
+                if "|" in chiave
+            )
+        ),
+        reverse=True
+    )
+
+    if mesi_database:
+
+        mese_archivio = st.sidebar.selectbox(
+            "Seleziona mese:",
+            mesi_database
+        )
+
+        prenotazioni_mese_archivio = []
+
+        for chiave, dati in db_prenotazioni.items():
+
+            if chiave.startswith(mese_archivio):
+
+                parti = chiave.split("|")
+
+                if len(parti) == 3:
+
+                    prenotazioni_mese_archivio.append({
+                        "data": parti[0],
+                        "turno": parti[1],
+                        "tavolo": parti[2],
+                        "cliente": dati.get("cliente", ""),
+                        "tel": dati.get("tel", ""),
+                        "persone": dati.get("persone", 2),
+                        "note": dati.get("note", ""),
+                        "stato": dati.get("stato", "Prenotato")
+                    })
+
+        st.sidebar.caption(
+            f"🗓️ {mese_archivio}"
+        )
+
+        st.sidebar.write(
+            f"Prenotazioni: "
+            f"{len([p for p in prenotazioni_mese_archivio if p['stato'] != 'Cancellato'])}"
+        )
+
+        st.sidebar.write(
+            "Persone: "
+            + str(
+                sum(
+                    int(p["persone"])
+                    for p in prenotazioni_mese_archivio
+                    if p["stato"] != "Cancellato"
+                )
+            )
+        )
+
+    else:
+
+        mese_archivio = None
+
+        st.sidebar.info(
+            "Nessuna prenotazione archiviata."
+        )
+
+
+# ------------------------------------------------------------
+# ARCHIVIO ANNO
+# ------------------------------------------------------------
+
+else:
+
+    anni_database = sorted(
+        list(
+            set(
+                chiave.split("|")[0][:4]
+                for chiave in db_prenotazioni.keys()
+                if "|" in chiave
+            )
+        ),
+        reverse=True
+    )
+
+    if anni_database:
+
+        anno_archivio = st.sidebar.selectbox(
+            "Seleziona anno:",
+            anni_database
+        )
+
+        prenotazioni_anno_archivio = []
+
+        for chiave, dati in db_prenotazioni.items():
+
+            if chiave.startswith(anno_archivio):
+
+                parti = chiave.split("|")
+
+                if len(parti) == 3:
+
+                    prenotazioni_anno_archivio.append({
+                        "data": parti[0],
+                        "turno": parti[1],
+                        "tavolo": parti[2],
+                        "cliente": dati.get("cliente", ""),
+                        "tel": dati.get("tel", ""),
+                        "persone": dati.get("persone", 2),
+                        "note": dati.get("note", ""),
+                        "stato": dati.get("stato", "Prenotato")
+                    })
+
+        st.sidebar.caption(
+            f"👑 {anno_archivio}"
+        )
+
+        st.sidebar.write(
+            f"Prenotazioni: "
+            f"{len([p for p in prenotazioni_anno_archivio if p['stato'] != 'Cancellato'])}"
+        )
+
+        st.sidebar.write(
+            "Persone: "
+            + str(
+                sum(
+                    int(p["persone"])
+                    for p in prenotazioni_anno_archivio
+                    if p["stato"] != "Cancellato"
+                )
+            )
+        )
+
+    else:
+
+        anno_archivio = None
+
+        st.sidebar.info(
+            "Nessuna prenotazione archiviata."
+        )
 
 
 # ============================================================
-# RICERCA PRENOTAZIONE
+# RESET DATABASE PROTETTO
+# ============================================================
+
+st.sidebar.markdown("---")
+
+st.sidebar.header("🔐 Strumenti di Sistema")
+
+with st.sidebar.expander("⚠️ Reset Database"):
+
+    st.warning(
+        "Questa operazione cancella tutte "
+        "le prenotazioni dal database."
+    )
+
+    password_reset = st.text_input(
+        "Password amministratore:",
+        type="password",
+        key="password_reset"
+    )
+
+    conferma_reset = st.checkbox(
+        "Confermo di voler cancellare tutte le prenotazioni",
+        key="conferma_reset"
+    )
+
+    if st.button(
+        "🗑️ RESETTA DATABASE",
+        use_container_width=True
+    ):
+
+        password_corretta = hmac.compare_digest(
+            password_reset,
+            RESET_PASSWORD
+        )
+
+        if not password_corretta:
+
+            st.error(
+                "❌ Password non corretta."
+            )
+
+        elif not conferma_reset:
+
+            st.error(
+                "❌ Devi confermare il reset."
+            )
+
+        else:
+
+            # Backup definitivo prima del reset
+            if os.path.exists(DB_FILE):
+
+                try:
+                    shutil.copy2(
+                        DB_FILE,
+                        BACKUP_FILE
+                    )
+                except Exception:
+                    pass
+
+                os.remove(DB_FILE)
+
+            st.success(
+                "✅ Database resettato."
+            )
+
+            st.rerun()
+
+
+# ============================================================
+# RICERCA
 # ============================================================
 
 st.header("🔎 Cerca Prenotazione")
@@ -409,20 +705,22 @@ if ricerca.strip():
 
             with st.container(border=True):
 
-                col1, col2, col3, col4 = st.columns(
-                    [1.3, 2, 2, 1]
+                c1, c2, c3, c4 = st.columns(
+                    [1.2, 2, 2, 1]
                 )
 
-                with col1:
+                with c1:
+
                     st.markdown(
                         f"### {risultato['data']}"
                     )
 
                     st.write(
-                        risultato["tavolo"]
+                        f"🪑 {risultato['tavolo']}"
                     )
 
-                with col2:
+                with c2:
+
                     st.markdown(
                         f"**👤 {risultato['cliente']}**"
                     )
@@ -435,28 +733,37 @@ if ricerca.strip():
                         f"📞 {risultato['tel']}"
                     )
 
-                with col3:
+                with c3:
+
                     st.write(
                         f"🕐 {risultato['turno']}"
                     )
 
                     if risultato["note"]:
+
                         st.caption(
                             f"📝 {risultato['note']}"
                         )
 
-                with col4:
+                with c4:
 
-                    stato = risultato["stato"]
+                    if risultato["stato"] == "Arrivato":
 
-                    if stato == "Arrivato":
-                        st.success("🟢 ARRIVATO")
+                        st.success(
+                            "🟢 ARRIVATO"
+                        )
 
-                    elif stato == "Cancellato":
-                        st.error("⚫ CANCELLATO")
+                    elif risultato["stato"] == "Cancellato":
+
+                        st.error(
+                            "⚫ CANCELLATO"
+                        )
 
                     else:
-                        st.warning("🟠 PRENOTATO")
+
+                        st.warning(
+                            "🟠 PRENOTATO"
+                        )
 
     else:
 
@@ -484,7 +791,10 @@ data_selezionata = st.date_input(
 data_chiave = data_selezionata.isoformat()
 
 
-# Lunedì chiuso
+# ============================================================
+# CONTROLLO LUNEDÌ
+# ============================================================
+
 if data_selezionata.weekday() == 0:
 
     st.error(
@@ -501,7 +811,7 @@ TURNI = ottieni_turni_del_giorno(
 
 
 # ============================================================
-# RIEPILOGO DELLA GIORNATA
+# RIEPILOGO GIORNATA
 # ============================================================
 
 prenotazioni_oggi = prenotazioni_giornaliere(
@@ -514,7 +824,9 @@ prenotazioni_attive = [
     if p["stato"] != "Cancellato"
 ]
 
-numero_prenotazioni = len(prenotazioni_attive)
+numero_prenotazioni = len(
+    prenotazioni_attive
+)
 
 numero_persone = sum(
     int(p["persone"])
@@ -522,18 +834,21 @@ numero_persone = sum(
 )
 
 st.subheader(
-    f"📋 Riepilogo del {data_selezionata.strftime('%d/%m/%Y')}"
+    "📋 Riepilogo del "
+    + data_selezionata.strftime("%d/%m/%Y")
 )
 
 r1, r2, r3 = st.columns(3)
 
 with r1:
+
     st.metric(
         "📌 Prenotazioni",
         numero_prenotazioni
     )
 
 with r2:
+
     st.metric(
         "👥 Persone",
         numero_persone
@@ -546,7 +861,7 @@ with r3:
     )
 
     st.metric(
-        "🪑 Posti disponibili totali",
+        "🪑 Posti totali",
         posti_totali
     )
 
@@ -557,28 +872,74 @@ with r3:
 
 st.header("📌 Inserisci Nuova Prenotazione")
 
+
+# ============================================================
+# PRESELEZIONE DAL TABELLONE
+# ============================================================
+
+turno_preselezionato = st.session_state.get(
+    "pre_turno"
+)
+
+tavolo_preselezionato = st.session_state.get(
+    "pre_tavolo"
+)
+
+if turno_preselezionato:
+
+    st.info(
+        f"📌 Prenotazione rapida selezionata: "
+        f"**{tavolo_preselezionato}** — "
+        f"**{turno_preselezionato}**"
+    )
+
+
+lista_turni = list(TURNI.keys())
+
+if (
+    turno_preselezionato
+    and turno_preselezionato in lista_turni
+):
+
+    indice_turno_default = lista_turni.index(
+        turno_preselezionato
+    )
+
+else:
+
+    indice_turno_default = 0
+
+
 col_turno_sel, col1, col2, col3 = st.columns(4)
+
 
 with col_turno_sel:
 
     turno_selezionato = st.selectbox(
         "In quale turno inserire:",
-        list(TURNI.keys())
+        lista_turni,
+        index=indice_turno_default,
+        key="nuova_prenotazione_turno"
     )
+
 
 with col1:
 
     cognome = st.text_input(
         "Cognome Cliente",
-        placeholder="es. Rossi"
+        placeholder="es. Rossi",
+        key="nuova_prenotazione_cognome"
     ).strip()
+
 
 with col2:
 
     telefono = st.text_input(
         "Numero di Telefono",
-        placeholder="es. 347123456"
+        placeholder="es. 347123456",
+        key="nuova_prenotazione_tel"
     ).strip()
+
 
 with col3:
 
@@ -587,7 +948,8 @@ with col3:
         min_value=1,
         max_value=4,
         value=2,
-        step=1
+        step=1,
+        key="nuova_prenotazione_persone"
     )
 
 
@@ -600,20 +962,25 @@ col_g, col_l, col_n = st.columns(3)
 with col_g:
 
     glutine = st.checkbox(
-        "Intolleranza al Glutine"
+        "Intolleranza al Glutine",
+        key="nuova_glutine"
     )
+
 
 with col_l:
 
     lattosio = st.checkbox(
-        "Intolleranza al Lattosio"
+        "Intolleranza al Lattosio",
+        key="nuova_lattosio"
     )
+
 
 with col_n:
 
     altre_note = st.text_input(
         "Note aggiuntive",
-        placeholder="es. Seggiolone..."
+        placeholder="es. Seggiolone...",
+        key="nuova_note"
     )
 
 
@@ -640,21 +1007,40 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
         ):
 
             bord_disponibili.append(
-                f"{t_nome} ({cap_max} pers)"
+                t_nome
             )
 
 
 if bord_disponibili:
 
-    bord_scelto_completo = st.selectbox(
-        "Seleziona tavolo libero:",
-        bord_disponibili
+    # Se il tavolo selezionato dal tabellone
+    # è ancora disponibile, lo mettiamo come default
+    if (
+        tavolo_preselezionato
+        in bord_disponibili
+    ):
+
+        indice_tavolo_default = (
+            bord_disponibili.index(
+                tavolo_preselezionato
+            )
+        )
+
+    else:
+
+        indice_tavolo_default = 0
+
+
+    bord_scelto = st.selectbox(
+        "🪑 Seleziona tavolo:",
+        bord_disponibili,
+        index=indice_tavolo_default,
+        key="nuova_prenotazione_tavolo"
     )
 
-    bord_scelto = bord_scelto_completo.split(" (")[0]
 
     if st.button(
-        "✅ Conferma Prenotazione Tavolo",
+        "✅ CONFERMA PRENOTAZIONE",
         use_container_width=True
     ):
 
@@ -669,16 +1055,19 @@ if bord_disponibili:
             lista_note = []
 
             if glutine:
+
                 lista_note.append(
                     "⚠️ SENZA GLUTINE"
                 )
 
             if lattosio:
+
                 lista_note.append(
                     "⚠️ SENZA LATTOSIO"
                 )
 
             if altre_note.strip():
+
                 lista_note.append(
                     altre_note.strip()
                 )
@@ -695,31 +1084,54 @@ if bord_disponibili:
                 f"{bord_scelto}"
             )
 
-            db_aggiornato[
-                chiave_salvataggio
-            ] = {
+            # Controllo finale contro doppia prenotazione
+            if chiave_salvataggio in db_aggiornato:
 
-                "cliente": cognome,
+                st.error(
+                    "❌ Questo tavolo è stato appena prenotato."
+                )
 
-                "tel": telefono,
+            else:
 
-                "persone": int(persone),
+                db_aggiornato[
+                    chiave_salvataggio
+                ] = {
 
-                "note": nota_finale,
+                    "cliente":
+                        cognome,
 
-                "stato": "Prenotato"
-            }
+                    "tel":
+                        telefono,
 
-            salva_database(
-                db_aggiornato
-            )
+                    "persone":
+                        int(persone),
 
-            st.success(
-                f"✅ Prenotazione salvata: "
-                f"{cognome} — {bord_scelto}"
-            )
+                    "note":
+                        nota_finale,
 
-            st.rerun()
+                    "stato":
+                        "Prenotato"
+                }
+
+                salva_database(
+                    db_aggiornato
+                )
+
+                # Reset della prenotazione rapida
+                st.session_state[
+                    "pre_turno"
+                ] = None
+
+                st.session_state[
+                    "pre_tavolo"
+                ] = None
+
+                st.success(
+                    f"✅ Prenotazione salvata: "
+                    f"{cognome} — {bord_scelto}"
+                )
+
+                st.rerun()
 
 else:
 
@@ -743,6 +1155,7 @@ prenotazioni_modificabili = [
     if p["stato"] != "Cancellato"
 ]
 
+
 if prenotazioni_modificabili:
 
     opzioni_modifica = []
@@ -756,20 +1169,25 @@ if prenotazioni_modificabili:
             f"{p['turno']}"
         )
 
+
     scelta_modifica = st.selectbox(
-        "Seleziona la prenotazione da modificare:",
-        opzioni_modifica
+        "Seleziona la prenotazione:",
+        opzioni_modifica,
+        key="selezione_modifica"
     )
+
 
     indice_modifica = opzioni_modifica.index(
         scelta_modifica
     )
+
 
     prenotazione_selezionata = (
         prenotazioni_modificabili[
             indice_modifica
         ]
     )
+
 
     with st.expander(
         "📝 Apri modifica prenotazione",
@@ -796,6 +1214,7 @@ if prenotazioni_modificabili:
                 key="mod_tel"
             )
 
+
         with col_b:
 
             nuova_persone = st.number_input(
@@ -810,23 +1229,25 @@ if prenotazioni_modificabili:
                 key="mod_persone"
             )
 
-            indice_turno = list(
-                TURNI.keys()
-            ).index(
+
+            indice_turno = lista_turni.index(
                 prenotazione_selezionata[
                     "turno"
                 ]
             )
 
+
             nuovo_turno = st.selectbox(
                 "Turno",
-                list(TURNI.keys()),
+                lista_turni,
                 index=indice_turno,
                 key="mod_turno"
             )
 
 
-        st.markdown("**Tavolo**")
+        # --------------------------------------------
+        # TAVOLI DISPONIBILI PER LA MODIFICA
+        # --------------------------------------------
 
         tavoli_modifica = []
 
@@ -838,13 +1259,13 @@ if prenotazioni_modificabili:
                 f"{t_nome}"
             )
 
-            # Il tavolo originale rimane disponibile
-            if (
-                nuova_chiave
-                == prenotazione_selezionata[
+            chiave_vecchia = (
+                prenotazione_selezionata[
                     "chiave"
                 ]
-            ):
+            )
+
+            if nuova_chiave == chiave_vecchia:
 
                 if tavolo_compatibile(
                     t_nome,
@@ -868,6 +1289,7 @@ if prenotazioni_modificabili:
                         t_nome
                     )
 
+
         if tavoli_modifica:
 
             if (
@@ -876,18 +1298,21 @@ if prenotazioni_modificabili:
                 ] in tavoli_modifica
             ):
 
-                indice_tavolo = tavoli_modifica.index(
-                    prenotazione_selezionata[
-                        "tavolo"
-                    ]
+                indice_tavolo = (
+                    tavoli_modifica.index(
+                        prenotazione_selezionata[
+                            "tavolo"
+                        ]
+                    )
                 )
 
             else:
 
                 indice_tavolo = 0
 
+
             nuovo_tavolo = st.selectbox(
-                "Seleziona nuovo tavolo:",
+                "🪑 Tavolo",
                 tavoli_modifica,
                 index=indice_tavolo,
                 key="mod_tavolo"
@@ -903,14 +1328,18 @@ if prenotazioni_modificabili:
             )
 
 
-            col_salva, col_annulla = st.columns(2)
+            if st.button(
+                "💾 SALVA MODIFICHE",
+                use_container_width=True
+            ):
 
-            with col_salva:
+                if not nuovo_cliente.strip():
 
-                if st.button(
-                    "💾 SALVA MODIFICHE",
-                    use_container_width=True
-                ):
+                    st.error(
+                        "❌ Inserisci il cognome."
+                    )
+
+                else:
 
                     db_modifica = carica_database()
 
@@ -926,6 +1355,7 @@ if prenotazioni_modificabili:
                         f"{nuovo_tavolo}"
                     )
 
+
                     if (
                         nuova_chiave != vecchia_chiave
                         and nuova_chiave in db_modifica
@@ -933,13 +1363,7 @@ if prenotazioni_modificabili:
 
                         st.error(
                             "❌ Il nuovo tavolo "
-                            "non è più disponibile."
-                        )
-
-                    elif not nuovo_cliente.strip():
-
-                        st.error(
-                            "❌ Inserisci il cognome."
+                            "non è disponibile."
                         )
 
                     else:
@@ -952,6 +1376,7 @@ if prenotazioni_modificabili:
                             del db_modifica[
                                 vecchia_chiave
                             ]
+
 
                         db_modifica[
                             nuova_chiave
@@ -975,12 +1400,13 @@ if prenotazioni_modificabili:
                                 ]
                         }
 
+
                         salva_database(
                             db_modifica
                         )
 
                         st.success(
-                            "✅ Prenotazione modificata!"
+                            "✅ Prenotazione modificata."
                         )
 
                         st.rerun()
@@ -995,19 +1421,19 @@ if prenotazioni_modificabili:
 else:
 
     st.info(
-        "Non ci sono prenotazioni attive "
-        "da modificare per questa giornata."
+        "Nessuna prenotazione attiva "
+        "per questa giornata."
     )
 
 
 # ============================================================
-# TABELLONE GIORNALIERO
+# TABELLONE
 # ============================================================
 
 st.markdown("---")
 
 st.header(
-    "🪟 Tabellone Stato del Giorno: "
+    "🪟 Tabellone del "
     + data_selezionata.strftime("%d/%m/%Y")
 )
 
@@ -1024,13 +1450,13 @@ numero_colonne = len(
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
     st.markdown(
-        f"### 🪑 {t_nome} "
-        f"— {cap_max} posti"
+        f"### 🪑 {t_nome} — {cap_max} posti"
     )
 
     colonne_turno = st.columns(
         numero_colonne
     )
+
 
     for indice, t_nome_orario in enumerate(
         lista_turni_del_giorno
@@ -1044,9 +1470,10 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 f"{t_nome}"
             )
 
-            # ------------------------------------------------
-            # OCCUPATO
-            # ------------------------------------------------
+
+            # =================================================
+            # TAVOLO OCCUPATO
+            # =================================================
 
             if chiave_specifica in db_prenotazioni:
 
@@ -1059,16 +1486,22 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                     "Prenotato"
                 )
 
-                if stato == "Cancellato":
 
-                    st.markdown(
-                        "⚫ **CANCELLATO**"
-                    )
+                st.caption(
+                    t_nome_orario
+                )
 
-                elif stato == "Arrivato":
+
+                if stato == "Arrivato":
 
                     st.success(
                         "🟢 ARRIVATO"
+                    )
+
+                elif stato == "Cancellato":
+
+                    st.error(
+                        "⚫ CANCELLATO"
                     )
 
                 else:
@@ -1077,9 +1510,6 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                         "🟠 PRENOTATO"
                     )
 
-                st.caption(
-                    t_nome_orario
-                )
 
                 st.write(
                     f"👤 **{info_p.get('cliente', '')}**"
@@ -1093,6 +1523,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                     f"📞 {info_p.get('tel', '')}"
                 )
 
+
                 if info_p.get("note"):
 
                     st.caption(
@@ -1101,7 +1532,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 
                 # --------------------------------------------
-                # STATO ARRIVATO
+                # ARRIVATO
                 # --------------------------------------------
 
                 if stato == "Prenotato":
@@ -1114,10 +1545,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
                         db_stato = carica_database()
 
-                        if (
-                            chiave_specifica
-                            in db_stato
-                        ):
+                        if chiave_specifica in db_stato:
 
                             db_stato[
                                 chiave_specifica
@@ -1131,7 +1559,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 
                 # --------------------------------------------
-                # RIPRISTINA DA ARRIVATO
+                # RIPRISTINA
                 # --------------------------------------------
 
                 elif stato == "Arrivato":
@@ -1144,10 +1572,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
                         db_stato = carica_database()
 
-                        if (
-                            chiave_specifica
-                            in db_stato
-                        ):
+                        if chiave_specifica in db_stato:
 
                             db_stato[
                                 chiave_specifica
@@ -1164,30 +1589,27 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 # CANCELLA
                 # --------------------------------------------
 
-                if st.button(
-                    "❌ Cancella",
-                    key=f"del_{chiave_specifica}",
-                    use_container_width=True
-                ):
+                if stato != "Cancellato":
 
-                    db_cancella = carica_database()
-
-                    if (
-                        chiave_specifica
-                        in db_cancella
+                    if st.button(
+                        "❌ Cancella",
+                        key=f"del_{chiave_specifica}",
+                        use_container_width=True
                     ):
 
-                        # Non eliminiamo subito.
-                        # La prenotazione rimane nello storico.
-                        db_cancella[
-                            chiave_specifica
-                        ]["stato"] = "Cancellato"
+                        db_cancella = carica_database()
 
-                        salva_database(
-                            db_cancella
-                        )
+                        if chiave_specifica in db_cancella:
 
-                    st.rerun()
+                            db_cancella[
+                                chiave_specifica
+                            ]["stato"] = "Cancellato"
+
+                            salva_database(
+                                db_cancella
+                            )
+
+                        st.rerun()
 
 
                 # --------------------------------------------
@@ -1199,8 +1621,8 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 ):
 
                     st.caption(
-                        "Questa operazione elimina "
-                        "completamente la prenotazione."
+                        "Elimina completamente "
+                        "questa prenotazione."
                     )
 
                     if st.button(
@@ -1211,10 +1633,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
                         db_elimina = carica_database()
 
-                        if (
-                            chiave_specifica
-                            in db_elimina
-                        ):
+                        if chiave_specifica in db_elimina:
 
                             del db_elimina[
                                 chiave_specifica
@@ -1227,9 +1646,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                         st.rerun()
 
 
-            # ------------------------------------------------
-            # LIBERO
-            # ------------------------------------------------
+            # =================================================
+            # TAVOLO LIBERO
+            # =================================================
 
             else:
 
@@ -1240,6 +1659,11 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 st.caption(
                     t_nome_orario
                 )
+
+
+                # --------------------------------------------
+                # PRENOTAZIONE RAPIDA
+                # --------------------------------------------
 
                 if st.button(
                     "➕ Prenota",
@@ -1255,10 +1679,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                         "pre_tavolo"
                     ] = t_nome
 
-                    st.info(
-                        "Inserisci la prenotazione "
-                        "nel modulo sopra."
-                    )
+                    # Torna in cima alla pagina
+                    # con turno e tavolo già selezionati
+                    st.rerun()
 
 
     st.markdown(
@@ -1276,6 +1699,7 @@ st.markdown("---")
 
 st.header("📊 Riepilogo per Turno")
 
+
 for turno in TURNI.keys():
 
     prenotazioni_turno = []
@@ -1289,6 +1713,7 @@ for turno in TURNI.keys():
 
             prenotazioni_turno.append(p)
 
+
     numero_tavoli = len(
         prenotazioni_turno
     )
@@ -1298,7 +1723,9 @@ for turno in TURNI.keys():
         for p in prenotazioni_turno
     )
 
+
     col_a, col_b, col_c = st.columns(3)
+
 
     with col_a:
 
@@ -1306,14 +1733,304 @@ for turno in TURNI.keys():
             f"**{turno}**"
         )
 
+
     with col_b:
 
         st.write(
             f"🪑 {numero_tavoli} tavoli"
         )
 
+
     with col_c:
 
         st.write(
             f"👥 {persone_turno} persone"
         )
+
+
+# ============================================================
+# ARCHIVIO VISIBILE
+# ============================================================
+
+st.markdown("---")
+
+st.header("📚 Consultazione Archivio")
+
+
+if tipo_archivio == "Giorno":
+
+    if data_archivio_stringa:
+
+        dati_archivio = prenotazioni_giornaliere(
+            db_prenotazioni,
+            data_archivio_stringa
+        )
+
+        if dati_archivio:
+
+            st.subheader(
+                f"📅 Prenotazioni del "
+                f"{data_archivio_stringa}"
+            )
+
+            for p in dati_archivio:
+
+                with st.container(border=True):
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+
+                        st.write(
+                            f"🪑 **{p['tavolo']}**"
+                        )
+
+                        st.write(
+                            p["turno"]
+                        )
+
+                    with c2:
+
+                        st.write(
+                            f"👤 **{p['cliente']}**"
+                        )
+
+                        st.write(
+                            f"👥 {p['persone']} persone"
+                        )
+
+                        st.write(
+                            f"📞 {p['tel']}"
+                        )
+
+                    with c3:
+
+                        if p["stato"] == "Arrivato":
+
+                            st.success(
+                                "🟢 ARRIVATO"
+                            )
+
+                        elif p["stato"] == "Cancellato":
+
+                            st.error(
+                                "⚫ CANCELLATO"
+                            )
+
+                        else:
+
+                            st.warning(
+                                "🟠 PRENOTATO"
+                            )
+
+                        if p["note"]:
+
+                            st.caption(
+                                f"📝 {p['note']}"
+                            )
+
+        else:
+
+            st.info(
+                "Nessuna prenotazione per questo giorno."
+            )
+
+
+elif tipo_archivio == "Mese":
+
+    if mese_archivio:
+
+        dati_archivio = []
+
+        for chiave, dati in db_prenotazioni.items():
+
+            if chiave.startswith(mese_archivio):
+
+                parti = chiave.split("|")
+
+                if len(parti) == 3:
+
+                    dati_archivio.append({
+                        "data": parti[0],
+                        "turno": parti[1],
+                        "tavolo": parti[2],
+                        "cliente": dati.get("cliente", ""),
+                        "tel": dati.get("tel", ""),
+                        "persone": dati.get("persone", 2),
+                        "note": dati.get("note", ""),
+                        "stato": dati.get("stato", "Prenotato")
+                    })
+
+
+        dati_archivio.sort(
+            key=lambda x: (
+                x["data"],
+                x["turno"]
+            )
+        )
+
+
+        if dati_archivio:
+
+            st.subheader(
+                f"🗓️ Prenotazioni del mese "
+                f"{mese_archivio}"
+            )
+
+
+            for p in dati_archivio:
+
+                with st.container(border=True):
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+
+                        st.write(
+                            f"📅 **{p['data']}**"
+                        )
+
+                        st.write(
+                            f"🪑 {p['tavolo']}"
+                        )
+
+                    with c2:
+
+                        st.write(
+                            f"👤 **{p['cliente']}**"
+                        )
+
+                        st.write(
+                            f"👥 {p['persone']} persone"
+                        )
+
+                    with c3:
+
+                        st.write(
+                            p["turno"]
+                        )
+
+                        if p["stato"] == "Arrivato":
+
+                            st.success(
+                                "🟢 ARRIVATO"
+                            )
+
+                        elif p["stato"] == "Cancellato":
+
+                            st.error(
+                                "⚫ CANCELLATO"
+                            )
+
+                        else:
+
+                            st.warning(
+                                "🟠 PRENOTATO"
+                            )
+
+
+        else:
+
+            st.info(
+                "Nessuna prenotazione per questo mese."
+            )
+
+
+else:
+
+    if anno_archivio:
+
+        dati_archivio = []
+
+        for chiave, dati in db_prenotazioni.items():
+
+            if chiave.startswith(anno_archivio):
+
+                parti = chiave.split("|")
+
+                if len(parti) == 3:
+
+                    dati_archivio.append({
+                        "data": parti[0],
+                        "turno": parti[1],
+                        "tavolo": parti[2],
+                        "cliente": dati.get("cliente", ""),
+                        "tel": dati.get("tel", ""),
+                        "persone": dati.get("persone", 2),
+                        "note": dati.get("note", ""),
+                        "stato": dati.get("stato", "Prenotato")
+                    })
+
+
+        dati_archivio.sort(
+            key=lambda x: (
+                x["data"],
+                x["turno"]
+            )
+        )
+
+
+        if dati_archivio:
+
+            st.subheader(
+                f"👑 Prenotazioni dell'anno "
+                f"{anno_archivio}"
+            )
+
+
+            for p in dati_archivio:
+
+                with st.container(border=True):
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+
+                        st.write(
+                            f"📅 **{p['data']}**"
+                        )
+
+                        st.write(
+                            f"🪑 {p['tavolo']}"
+                        )
+
+                    with c2:
+
+                        st.write(
+                            f"👤 **{p['cliente']}**"
+                        )
+
+                        st.write(
+                            f"👥 {p['persone']} persone"
+                        )
+
+                    with c3:
+
+                        st.write(
+                            p["turno"]
+                        )
+
+                        if p["stato"] == "Arrivato":
+
+                            st.success(
+                                "🟢 ARRIVATO"
+                            )
+
+                        elif p["stato"] == "Cancellato":
+
+                            st.error(
+                                "⚫ CANCELLATO"
+                            )
+
+                        else:
+
+                            st.warning(
+                                "🟠 PRENOTATO"
+                            )
+
+        else:
+
+            st.info(
+                "Nessuna prenotazione per questo anno."
+            )
+```
