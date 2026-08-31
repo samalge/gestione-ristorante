@@ -86,10 +86,6 @@ for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
 
 giorno_sett = data_selezionata.weekday()
 
-# Stato di reset dinamico del form di inserimento
-if "form_reset_id" not in st.session_state:
-    st.session_state["form_reset_id"] = 0
-
 # --- BLOCCO PRENOTAZIONE ---
 st.header("📌 Registrera ny bokning")
 col_turno_sel, col1, col2, col3 = st.columns(4)
@@ -105,20 +101,20 @@ with col_turno_sel:
     turno_selezionato = st.selectbox("Välj skift för bokning:", lista_turni_disponibili, index=default_turno_index)
 
 with col1:
-    cognome = st.text_input("Kundens efternamn", placeholder="t.ex. Rossi", key=f"cognome_{st.session_state['form_reset_id']}").strip()
+    cognome = st.text_input("Kundens efternamn", placeholder="t.ex. Rossi").strip()
 with col2:
-    telefono = st.text_input("Telefonnummer", placeholder="t.ex. 076123456", key=f"tel_{st.session_state['form_reset_id']}")
+    telefono = st.text_input("Telefonnummer", placeholder="t.ex. 076123456")
 with col3:
-    persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2, key=f"pers_{st.session_state['form_reset_id']}")
+    persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2)
 
 st.markdown("**Allergier eller särskilda önskemål:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
-    glutine = st.checkbox("Glutenintolerans (Glutenfri)", key=f"glut_{st.session_state['form_reset_id']}")
+    glutine = st.checkbox("Glutenintolerans (Glutenfri)")
 with col_l:
-    lattosio = st.checkbox("Laktosintolerans (Laktosfri)", key=f"latt_{st.session_state['form_reset_id']}")
+    lattosio = st.checkbox("Laktosintolerans (Laktosfri)")
 with col_n:
-    altre_note = st.text_input("Andra önskemål (t.ex. Barnstol)", placeholder="Skriv här...", key=f"note_{st.session_state['form_reset_id']}")
+    altre_note = st.text_input("Andra önskemål (t.ex. Barnstol)", placeholder="Skriv här...")
 
 # Calcolo sovrapposizioni per bloccare la scelta adiacente nel menu a tendina
 tavoli_occupati_in_turno_adiacente = []
@@ -152,8 +148,8 @@ if "pre_tavolo" in st.session_state:
         default_tavolo_index = bord_disponibili.index(testo_cercato)
 
 if bord_disponibili:
-    bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index, key=f"sel_bord_{st.session_state['form_reset_id']}")
-    # 🔴 CORREZIONE RIGIDA: aggiunto l'indice [0] per prendere solo la stringa di testo ed evitare il crash delle liste
+    bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
+    # 🔴 CORREZIONE RIGIDA: Estratta la stringa pura usando l'indice [0]
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -173,7 +169,6 @@ if bord_disponibili:
             
             if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
             if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
-            st.session_state["form_reset_id"] += 1
             
             st.success(f"✅ Bokning klar för {bord_scelto} under {turno_selezionato}!")
             st.rerun()
@@ -206,7 +201,15 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE RIGIDA: aggiunto l'indice [0] per stampare correttamente la stringa stringa del turno
+            # 🔴 CORREZIONE RIGIDA: Estratta la stringa pura del turno usando l'indice [0]
             nome_turno_breve = t_nome_orario.split(" (")[0]
             
             st.markdown(f"**{nome_turno_breve}**")
+            st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
+            
+            if t_bloccato:
+                info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
+                st.markdown("🟠 <span style='color: #FF5722; font-size: 20px; font-weight: bold;'>BLOCKERAT</span>", unsafe_allow_html=True)
+                st.caption(f"Bokat i nästa skift: {info_blocco['cliente']}")
+            elif chiave_specifica in db_prenotazioni:
+                info_p = db_prenotazioni[chiave_specifica]
