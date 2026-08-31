@@ -19,7 +19,7 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
-    elif giorno_settimana in:  # VENERDÌ E SABATO (Pranzo 11:00, Cena sfalsata fino alle 23:00)
+    elif giorno_settimana in (4, 5):  # CORRETTO: VENERDÌ E SABATO (Pranzo 11:00, Cena sfalsata fino alle 23:00)
         return {
             "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
@@ -107,7 +107,7 @@ if giorno_sett == 6:  # Domenica mattina sfalsata
         turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
     elif "Lunch - Skift 2" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
-elif giorno_sett in:  # Venerdì e Sabato sera sfalsati
+elif giorno_sett in (4, 5):  # CORRETTO: Venerdì e Sabato sera sfalsati
     if "Middag - Skift 3" in turno_selezionato:
         turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
     elif "Middag - Skift 4" in turno_selezionato:
@@ -128,7 +128,6 @@ with col2:
 with col3:
     persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2)
 
-# Sezione Opzioni Speciali / Intolleranze
 st.markdown("**Allergier eller särskilda önskemål:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
@@ -154,7 +153,6 @@ if bord_disponibili:
         if not cognome:
             st.error("⚠️ Vänligen fyll i kundens efternamn innan du sparar.")
         else:
-            # Uniamo le intolleranze selezionate in una stringa di note
             lista_note = []
             if glutine: lista_note.append("⚠️ GLUTENFRI")
             if lattosio: lista_note.append("⚠️ LAKTOSFRI")
