@@ -60,7 +60,7 @@ def salva_database(db):
     with open(DB_FILE, "w") as f:
         json.dump(db, f, indent=4)
 
-# Carichiamo il registro unico delle prenotazioni
+# Carichiamo lo stato attuale del database ad ogni refresh della pagina
 db_prenotazioni = carica_database()
 
 st.header("📆 Seleziona Data e Turno")
@@ -80,14 +80,14 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Scegli il turno:", list(TURNI.keys()))
 
-# Configurazione fissa e immutabile della sala
+# Configurazione fissa dei tavoli (2 o 4 posti)
 TAVOLI_MAPPATURA = {}
 for i in range(1, 4):   TAVOLI_MAPPATURA[f"Bord {i}"] = 2
 for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
 
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI GLOBALI (Turni sfalsati domenicali e weekend)
+# CALCOLO DELLE SOVRAPPOSIZIONI (Domenica pranzo & Venerdì/Sabato sera)
 tavoli_occupati_in_turno_adiacente = []
 turno_adiacente = None
 
@@ -118,7 +118,7 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergier o richieste speciali:**")
+st.markdown("**Allergie o richieste speciali:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
@@ -127,12 +127,11 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
-# Generazione dinamica dei tavoli selezionabili nel menu a tendina
+# Mostra nel menu solo i tavoli liberi per QUESTO SPECIFICO giorno e turno
 bord_disponibili = []
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     chiave_corrente = f"{data_chiave}|{turno_selezionato}|{t_nome}"
     
-    # Il tavolo è libero solo se non è prenotato nel turno corrente e non è bloccato dall'adiacente
     if chiave_corrente not in db_prenotazioni and t_nome not in tavoli_occupati_in_turno_adiacente:
         if persone <= 2 and cap_max == 2:
             bord_disponibili.append(f"{t_nome} (2 pers)")
@@ -141,7 +140,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo da assegnare:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrazione pulita e garantita al 100% della stringa tavolo
+    bord_scelto = bord_scelto_completo.split(" (")[0] # Estrae "Bord X" in modo sicuro
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -153,14 +152,16 @@ if bord_disponibili:
             if altre_note.strip(): lista_note.append(altre_note.strip())
             nota_finale = " | ".join(lista_note)
             
-            # Salvataggio lineare a chiave unica
+            # 🔴 CORREZIONE CRUCIALE: Ricarichiamo il DB all'istante esatto del click per evitare sovrascritture di Streamlit
+            db_aggiornato = carica_database()
             chiave_salvataggio = f"{data_chiave}|{turno_selezionato}|{bord_scelto}"
-            db_prenotazioni[chiave_salvataggio] = {
+            
+            db_aggiornato[chiave_salvataggio] = {
                 "cliente": cognome,
                 "tel": telefono,
                 "note": nota_finale
             }
-            salva_database(db_prenotazioni)
+            salva_database(db_aggiornato)
             st.success(f"✅ Prenotazione completata! Il {bord_scelto} è stato assegnato a {cognome}")
             st.rerun()
 else:
@@ -176,7 +177,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     with col_bord:
         if t_nome in tavoli_occupati_in_turno_adiacente:
             chiave_adiacente_cerca = f"{data_chiave}|{turno_adiacente}|{t_nome}"
-            info_altro = db_prenotazioni[chiave_adiacente_cerca]
+            info_altro = db_prenotazioni.get(chiave_adiacente_cerca, {"cliente": "Sconosciuto", "tel": "", "note": ""})
             st.markdown(f"🟠 <span style='color: #FF5722; font-size: 24px; font-weight: bold;'>{t_nome}</span> ({cap_testo}) | BLOCCATO (Prenotato nel turno sovrapposto)", unsafe_allow_html=True)
             st.write(f"👉 Cliente nel turno adiacente: {info_altro['cliente']} ({info_altro['tel']})")
             if info_altro.get("note"):
@@ -196,8 +197,10 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
             st.write("🔒 *Gestisci la prenotazione dal turno adiacente*")
         elif chiave_tavolo_corrente in db_prenotazioni:
             if st.button("Libera Tavolo", key=f"free_{chiave_tavolo_corrente}"):
-                del db_prenotazioni[chiave_tavolo_corrente]
-                salva_database(db_prenotazioni)
+                db_da_liberare = carica_database()
+                if chiave_tavolo_corrente in db_da_liberare:
+                    del db_da_liberare[chiave_tavolo_corrente]
+                    salva_database(db_da_liberare)
                 st.rerun()
                 
     st.markdown("<hr style='margin: 8px 0; border: 0.5px solid #333;'>", unsafe_allow_html=True)
