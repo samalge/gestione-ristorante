@@ -84,7 +84,7 @@ salva_bord(dati_generali)
 bord_attuali = dati_generali[data_chiave][turno_selezionato]
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI GLOBALI
+# CALCOLO DELLE SOVRAPPOSIZIONI GLOBALI (Solo per i turni sfalsati domenicali e weekend)
 tavoli_bloccati_da_sovrapposizione = []
 turno_adiacente = None
 
@@ -133,7 +133,7 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    # RISOLTO: Ora prende la stringa pulita ("Bord 1") ed evita salvataggi corrotti in formato lista
+    # 🔴 FIX DEFINITIVO: Aggiunto [0] per prendere solo il testo pulito (es. "Bord 1") invece della lista
     bord_scelto = bord_scelto_completo.split(" (")[0] 
     
     if st.button("Boka valt bord"):
