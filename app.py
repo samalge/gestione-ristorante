@@ -153,7 +153,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index, key=f"sel_bord_{st.session_state['form_reset_id']}")
-    # 🔴 CORREZIONE RIGIDA STRINGA TAVOLO: Prende solo la prima stringa prima della parentesi
+    # 🔴 FIX DEFINITIVO: aggiunto [0] per prendere solo la stringa pura "Bord X"
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -171,7 +171,6 @@ if bord_disponibili:
             db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
             salva_database(db_aggiornato)
             
-            # Svuota i campi della sessione ed incrementa il reset ID
             if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
             if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
             st.session_state["form_reset_id"] += 1
@@ -207,7 +206,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE FINALE ESTRAZIONE STRINGA TURNO: Prende solo la stringa prima della parentesi aperta
+            # 🔴 FIX DEFINITIVO: aggiunto [0] per stampare la stringa pulita del turno a schermo
             nome_turno_breve = t_nome_orario.split(" (")[0]
             
             st.markdown(f"**{nome_turno_breve}**")
+            st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
+            
