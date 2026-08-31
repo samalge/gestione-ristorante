@@ -29,28 +29,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # DOMENICA
         return {
-            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
     elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
-            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"},
+            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00"}
         }
     else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
 
 def carica_database():
@@ -149,7 +149,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Boka valt bord"):
         if not cognome:
@@ -200,14 +200,17 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            nome_turno_breve = t_nome_orario.split(" (")[0]
+            nome_turno_breve = t_nome_orario.split(" (")
+            
+            # Mostra il nome dello skift e sotto gli orari di inizio e fine estratti dal dizionario
             st.markdown(f"**{nome_turno_breve}**")
+            st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                # 🟠 PALLINO ARANCIONE RIPRISTINATO CON RIGIDO FORMATO HTML
                 st.markdown("🟠 <span style='color: #FF5722; font-size: 20px; font-weight: bold;'>BLOCKERAT</span>", unsafe_allow_html=True)
                 st.caption(f"Bokat i nästa skift: {info_blocco['cliente']}")
             elif chiave_specifica in db_prenotazioni:
                 info_p = db_prenotazioni[chiave_specifica]
-                # 🔴 PALLINO ROSSO RIPRISTINATO CON RIGIDO FORMATO HTML
+                st.markdown("🔴 <span style='color: #D32F2F; font-size: 20px; font-weight: bold;'>BOKAT</span>", unsafe_allow_html=True)
+                st.write(f"👤 **{info_p['cliente']}**")
