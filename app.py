@@ -24,28 +24,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # DOMENICA
         return {
-            "Pranzo - Turno 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0), "label": "12:00 - 14:00"},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0), "label": "13:00 - 15:00"},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0), "label": "16:00 - 18:00"},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0), "label": "18:00 - 20:00"},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0), "label": "20:00 - 22:00"}
+            "Pranzo - Turno 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
     elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
         return {
-            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0), "label": "11:00 - 13:00"},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0), "label": "13:00 - 15:00"},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0), "label": "16:00 - 18:00"},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0), "label": "18:00 - 20:00"},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0), "label": "20:00 - 22:00"},
-            "Cena - Turno 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0), "label": "21:00 - 23:00"}
+            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
+            "Cena - Turno 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
         }
     else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
         return {
-            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0), "label": "11:00 - 13:00"},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0), "label": "13:00 - 15:00"},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0), "label": "16:00 - 18:00"},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0), "label": "18:00 - 20:00"},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0), "label": "20:00 - 22:00"}
+            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
 
 def carica_database():
@@ -65,7 +65,7 @@ db_prenotazioni = carica_database()
 
 
 # =========================================================================
-# 📊 PANNELLO STATISTICHE NELLA BARRA LATERALE (A SINISTRA)
+# 📊 PANNELLO STATISTICHE ISOLATO NELLA BARRA LATERALE (A SINISTRA)
 # =========================================================================
 st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
 st.sidebar.header("📊 Statistikpanel")
@@ -73,7 +73,7 @@ st.sidebar.header("📊 Statistikpanel")
 tipo_stat = st.sidebar.selectbox(
     "Välj statistikvy:",
     ["Specifik dag", "Hel månad", "Hela året"],
-    key="menu_scelta_statistiche_pizzeria"
+    key="panel_statistiche_pizzeria_sidebar"
 )
 
 totale_ospiti_calcolato = 0
@@ -81,7 +81,7 @@ mappa_posti_fissi = {"Bord 1": 2, "Bord 2": 2, "Bord 3": 2, "Bord 4": 4, "Bord 5
 data_oggi_stat = datetime.now()
 
 if tipo_stat == "Specifik dag":
-    giorno_scelto_stat = st.sidebar.date_input("Välj dag:", value=data_oggi_stat.date(), key="stat_input_giorno_singolo")
+    giorno_scelto_stat = st.sidebar.date_input("Välj dag:", value=data_oggi_stat.date(), key="stat_day_picker")
     prefisso_cerca = giorno_scelto_stat.isoformat()
     for chiave in db_prenotazioni.keys():
         if chiave.startswith(prefisso_cerca):
@@ -89,12 +89,12 @@ if tipo_stat == "Specifik dag":
             totale_ospiti_calcolato += mappa_posti_fissi.get(tavolo_id, 2)
 
 elif tipo_stat == "Hel månad":
-    anno_scelto_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_input_anno_mese")
+    anno_scelto_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_year_picker_m")
     mese_scelto_stat = st.sidebar.selectbox(
         "Välj månad:",
         ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
         index=data_oggi_stat.month - 1,
-        key="stat_input_nome_mese"
+        key="stat_month_picker"
     )
     mappa_mesi = {"Januari":"01", "Februari":"02", "Mars":"03", "April":"04", "Maj":"05", "Juni":"06", "Juli":"07", "Augusti":"08", "September":"09", "Oktober":"10", "November":"11", "December":"12"}
     prefisso_cerca = f"{anno_scelto_stat}-{mappa_mesi[mese_scelto_stat]}"
@@ -104,7 +104,7 @@ elif tipo_stat == "Hel månad":
             totale_ospiti_calcolato += mappa_posti_fissi.get(tavolo_id, 2)
 
 elif tipo_stat == "Hela året":
-    anno_solo_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_input_anno_intero")
+    anno_solo_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_year_only_picker")
     prefisso_cerca = f"{anno_solo_stat}-"
     for chiave in db_prenotazioni.keys():
         if chiave.startswith(prefisso_cerca):
@@ -148,7 +148,7 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergier o richieste speciali per questa prenotazione:**")
+st.markdown("**Allergie o richieste speciali per questa prenotazione:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
@@ -205,4 +205,12 @@ else:
     st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
 
-# --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 INTERFACCIA ORIGINALE: TABELLONE COMPLETO DELLA GIORNATA ---
+st.header("🪟 Tabellone Stato di Oggi: " + str(data_selezionata.strftime('%d/%m/%Y')))
+
+# Creiamo le colonne per ogni turno presente nella giornata attuale
+lista_turni_del_giorno = list(TURNI.keys())
+numero_colonne = len(lista_turni_del_giorno)
+
+# Creiamo una riga per ogni tavolo della pizzeria
+for t_nome, cap_max in TAVOLI_MAPPATURA.items():
