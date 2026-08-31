@@ -114,28 +114,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # SÖNDAG
         return {
-            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00", "breve": "Lunch - Skift 1"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"}
+            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00", "breve": "Lunch - Skift 1", "tavolo_str": "Bord"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1", "tavolo_str": "Bord"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3", "tavolo_str": "Bord"}
         }
     elif giorno_settimana in (4, 5):  # FREDAG OCH LÖRDAG
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"},
-            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00", "breve": "Middag - Skift 4"}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1", "tavolo_str": "Bord"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1", "tavolo_str": "Bord"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3", "tavolo_str": "Bord"},
+            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00", "breve": "Middag - Skift 4", "tavolo_str": "Bord"}
         }
     else:  # TISDAG, ONSDAG, TORSDAG
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1", "tavolo_str": "Bord"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1", "tavolo_str": "Bord"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2", "tavolo_str": "Bord"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3", "tavolo_str": "Bord"}
         }
 
 st.header("📆 Välj datum")
@@ -211,9 +211,3 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 default_tavolo_index = 0
 if "pre_tavolo" in st.session_state:
-    testo_cercato = f"{st.session_state['pre_tavolo']} (2 pers)" if TAVOLI_MAPPATURA.get(st.session_state['pre_tavolo']) == 2 else f"{st.session_state['pre_tavolo']} (4 pers)"
-    if testo_cercato in bord_disponibili:
-        default_tavolo_index = bord_disponibili.index(testo_cercato)
-
-if bord_disponibili:
-    bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
