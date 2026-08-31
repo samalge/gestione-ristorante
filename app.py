@@ -24,6 +24,84 @@ if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotaz
     else:
         st.sidebar.error("❌ Password errata! Accesso negato.")
 
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
+
+# --- 📊 NUOVO PANNELLO STATISTICHE NELLA BARRA LATERALE ---
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+st.sidebar.header("📊 Statistikpanel")
+
+tipo_stat = st.sidebar.selectbox(
+    "Välj statistikvy:",
+    ["Specifik dag", "Hel månad", "Hela året"]
+)
+
+totale_ospiti_calcolato = 0
+
+# Configurazione fissa per calcolare i posti a sedere reali dei tavoli occupati
+mappa_posti_tavoli = {
+    "Bord 1": 2, "Bord 2": 2, "Bord 3": 2,
+    "Bord 4": 4, "Bord 5": 4, "Bord 6": 4, "Bord 7": 4, "Bord 8": 4, "Bord 9": 4, "Bord 10": 4
+}
+
+# Calcoliamo la data corrente per sincronizzare i menu a tendina delle statistiche
+oggi_data = datetime.now()
+
+if tipo_stat == "Specifik dag":
+    giorno_sel_stat = st.sidebar.date_input("Välj dag:", value=oggi_data.date(), key="sidebar_stat_day")
+    prefisso_cerca = giorno_sel_stat.isoformat()
+    
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            # Estraiamo il nome del tavolo alla fine della chiave (es: "Bord 1")
+            nome_tavolo_chiave = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
+
+elif tipo_stat == "Hel månad":
+    anno_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=oggi_data.year, key="sidebar_stat_month_year")
+    mese_stat = st.sidebar.selectbox(
+        "Välj månad:",
+        ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
+        index=oggi_data.month - 1,
+        key="sidebar_stat_month_select"
+    )
+    mesi_mappa_svedese = {
+        "Januari": "01", "Februari": "02", "Mars": "03", "April": "04", "Maj": "05", "Juni": "06",
+        "Juli": "07", "Augusti": "08", "September": "09", "Oktober": "10", "November": "11", "December": "12"
+    }
+    prefisso_cerca = f"{anno_stat}-{mesi_mappa_svedese[mese_stat]}"
+    
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            nome_tavolo_chiave = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
+
+elif tipo_stat == "Hela året":
+    anno_stat_solo = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=oggi_data.year, key="sidebar_stat_year_only")
+    prefisso_cerca = f"{anno_stat_solo}-"
+    
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            nome_tavolo_chiave = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
+
+st.sidebar.metric(label="👥 Totalt antal gäster:", value=f"{totale_ospiti_calcolato} st")
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+
+
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
     
@@ -52,21 +130,6 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
             "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
-
-def carica_database():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
 
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
@@ -160,58 +223,3 @@ else:
 # --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header(f"🪟 Tabellone Stato di Oggi: {data_selezionata.strftime('%d/%m/%Y')}")
 
-# Creiamo le colonne per ogni turno presente nella giornata attuale
-lista_turni_del_giorno = list(TURNI.keys())
-numero_colonne = len(lista_turni_del_giorno)
-
-# Creiamo una riga per ogni tavolo della pizzeria
-for t_nome, cap_max in TAVOLI_MAPPATURA.items():
-    st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
-    
-    # Allineiamo i turni in orizzontale su colonne distinte
-    colonne_turno = st.columns(numero_colonne)
-    
-    for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
-        with colonne_turno[indice]:
-            # Controlliamo la sovrapposizione locale per questo specifico turno
-            t_bloccato = False
-            t_adiacente_local = None
-            if giorno_sett == 6:
-                if "Pranzo - Turno 1" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 2 (13:00 - 15:00)"
-                elif "Pranzo - Turno 2" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 1 (12:00 - 14:00)"
-            elif giorno_sett in (4, 5):
-                if "Cena - Turno 3" in t_nome_orario: t_adiacente_local = "Cena - Turno 4 (21:00 - 23:00)"
-                elif "Cena - Turno 4" in t_nome_orario: t_adiacente_local = "Cena - Turno 3 (20:00 - 22:00)"
-            
-            if t_adiacente_local and f"{data_chiave}|{t_adiacente_local}|{t_nome}" in db_prenotazioni:
-                t_bloccato = True
-
-            chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            
-            st.markdown(f"**{t_nome_orario}**")
-            
-            if t_bloccato:
-                info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                st.markdown("🟠 BLOCCATO")
-                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
-            elif chiave_specifica in db_prenotazioni:
-                info_p = db_prenotazioni[chiave_specifica]
-                st.markdown("🔴 OCCUPATO")
-                st.write(f"👤 **{info_p['cliente']}**")
-                st.write(f"📞 {info_p['tel']}")
-                if info_p.get("note"):
-                    st.caption(f"📝 {info_p['note']}")
-                
-                if st.button("Libera", key=f"del_{chiave_specifica}"):
-                    db_cancella = carica_database()
-                    if chiave_specifica in db_cancella:
-                        del db_cancella[chiave_specifica]
-                        salva_database(db_cancella)
-                    st.rerun()
-            else:
-                st.markdown("🟢 LIBERO")
-                if st.button("Boka", key=f"book_{chiave_specifica}"):
-                    st.session_state["pre_turno"] = t_nome_orario
-                    st.session_state["pre_tavolo"] = t_nome
-                    st.rerun()
-                
