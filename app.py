@@ -9,53 +9,6 @@ st.title("Centralino: Prenotazioni Telefoniche")
 
 DB_FILE = "stato_bord.json"
 
-def carica_database():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
-
-
-# =========================================================================
-# 📊 ISOLATED SIDEBAR SUMMARY PANEL (LEFT SIDE) - TOTALLY INDEPENDENT
-# =========================================================================
-st.sidebar.header("📊 Riepilogo Prenotazioni")
-
-totale_giorno_attuale = 0
-totale_mese_attuale = 0
-totale_anno_attuale = 0
-
-# Track the system timestamps safely
-oggi_dt = datetime.now()
-data_chiave_oggi = oggi_dt.date().isoformat()
-stringa_filtro_mese = oggi_dt.strftime("%Y-%m")
-stringa_filtro_anno = oggi_dt.strftime("%Y-")
-
-# Read database keys without touching internal loop variables
-for chiave_pizzeria in db_prenotazioni.keys():
-    if chiave_pizzeria.startswith(data_chiave_oggi):
-        totale_giorno_attuale += 1
-    if chiave_pizzeria.startswith(stringa_filtro_mese):
-        totale_mese_attuale += 1
-    if chiave_pizzeria.startswith(stringa_filtro_anno):
-        totale_anno_attuale += 1
-
-st.sidebar.metric(label="📆 Tavoli prenotati oggi", value=f"{totale_giorno_attuale}")
-st.sidebar.metric(label="🗓️ Totale tavoli questo mese", value=f"{totale_mese_attuale}")
-st.sidebar.metric(label="👑 Totale tavoli questo anno", value=f"{totale_anno_attuale}")
-st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
-# =========================================================================
-
-
 # --- STRUMENTO DI RESET ---
 st.sidebar.header("🛠️ Strumenti di Sistema")
 if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotazioni e riparte da zero"):
@@ -95,6 +48,21 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
 
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
 data_selezionata = st.date_input("Scegli il giorno:", value=oggi_completo.date())
@@ -105,6 +73,35 @@ if data_selezionata.strftime("%A") == "Monday":
     st.stop()
 
 TURNI = ottieni_turni_del_giorno(data_selezionata)
+
+
+# =========================================================================
+# 📊 BLOCCO ISOLATO: RIASSUNTO PRENOTAZIONI NELLA BARRA LATERALE (A SINISTRA)
+# =========================================================================
+st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+st.sidebar.header("📊 Riepilogo Prenotazioni")
+
+totale_giorno = 0
+totale_mese = 0
+totale_anno = 0
+
+prefisso_mese = oggi_completo.strftime("%Y-%m")
+prefisso_anno = oggi_completo.strftime("%Y-")
+
+for chiave_db in db_prenotazioni.keys():
+    if chiave_db.startswith(data_chiave):
+        totale_giorno += 1
+    if chiave_db.startswith(prefisso_mese):
+        totale_mese += 1
+    if chiave_db.startswith(prefisso_anno):
+        totale_anno += 1
+
+st.sidebar.metric(label="📆 Tavoli prenotati oggi", value=f"{totale_giorno}")
+st.sidebar.metric(label="🗓️ Totale questo mese", value=f"{totale_mese}")
+st.sidebar.metric(label="👑 Totale questo anno", value=f"{totale_anno}")
+st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+# =========================================================================
+
 
 # Configurazione fissa dei tavoli (2 o 4 posti)
 TAVOLI_MAPPATURA = {}
@@ -162,7 +159,8 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")
+    # 🔴 CORREZIONE FONDAMENTALE: Aggiunto [0] per estrarre la stringa pulita del tavolo ed evitare database corrotti
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -220,3 +218,4 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
                 st.markdown("🟠 BLOCCATO")
+                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
