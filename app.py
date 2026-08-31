@@ -197,7 +197,7 @@ if bord_disponibili:
             
             db_aggiornato = carica_database()
             chiave_salvataggio = f"{data_chiave}|{turno_selezionato}|{bord_scelto}"
-            db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
+            db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telephone, "note": nota_finale}
             salva_database(db_aggiornato)
             st.success(f"✅ Prenotazione salvata per {bord_scelto} nel turno {turno_selezionato}!")
             st.rerun()
