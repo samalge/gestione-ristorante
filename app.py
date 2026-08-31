@@ -183,7 +183,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -208,9 +208,9 @@ else:
 # --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header("🪟 Tabellone Stato di Oggi: " + str(data_selezionata.strftime('%d/%m/%Y')))
 
-# Creiamo le colonne per ogni turno presente nella giornata attuale
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
-# Creiamo una riga per ogni tavolo della pizzeria
+# 🔴 ALLINEAMENTO RIGIDO A 4 SPAZI PER TUTTI I COMPONENTI SOTTOSTANTI
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
+    st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
