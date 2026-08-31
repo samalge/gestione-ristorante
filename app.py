@@ -147,7 +147,8 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")
+    # 🔴 CORREZIONE: Aggiunto [0] per prendere il nome pulito ("Bord X") come stringa pura
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
         if not cognome:
