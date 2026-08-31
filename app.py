@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime, time
 import json
 import os
+import copy
 
 st.set_page_config(page_title="Gestione Tavoli Pizzeria", layout="wide")
 st.title("Centralino: Prenotazioni Telefoniche")
@@ -148,7 +149,7 @@ if bord_disponibili:
             st.success(f"✅ Prenotazione salvata per {bord_scelto} nel turno {turno_selezionato}!")
             st.rerun()
 else:
-    st.warning(f"⚠️ Nessun tavolo disponibile per {persone} persone in questo specifico turno.")
+    st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
 
 # --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
@@ -193,8 +194,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 st.markdown(f"🔴 **OCCUPATO**\n\n👤 **{info_p['cliente']}**\n\n📞 {info_p['tel']}")
                 if info_p.get("note"):
                     st.caption(f"📝 {info_p['note']}")
-                # Pulsante per liberare il tavolo direttamente dal tabellone
-                if st.button("Libera", key=f"del_{chiave_specifica}", size="small"):
+                
+                # 🔴 CORREZIONE: Parametro size="small" rimosso per compatibilità standard con Streamlit
+                if st.button("Libera", key=f"del_{chiave_specifica}"):
                     db_cancella = carica_database()
                     if chiave_specifica in db_cancella:
                         del db_cancella[chiave_specifica]
@@ -203,4 +205,4 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
             else:
                 st.markdown("🟢 **LIBERO**")
                 
-    st.markdown("<hr style='margin: 12px 0; border: 1px solid #444;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 12px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
