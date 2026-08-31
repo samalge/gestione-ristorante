@@ -148,7 +148,7 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergie o richieste speciali per questa prenotazione:**")
+st.markdown("**Allergier o richieste speciali per questa prenotazione:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
@@ -208,7 +208,7 @@ else:
 # --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header(f"🪟 Tabellone Stato di Oggi: {data_selezionata.strftime('%d/%m/%Y')}")
 
-# Creiamo las colonne per ogni turno presente nella giornata attuale
+# Creiamo le colonne per ogni turno presente nella giornata attuale
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
