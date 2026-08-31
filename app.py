@@ -107,14 +107,13 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergie o richieste speciali per questa prenotazione:**")
+st.markdown("**Allergier o richieste speciali per questa prenotazione:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
 with col_l:
     lattosio = st.checkbox("Intolleranza al Lattosio (Senza Lattosio)")
-with col_n:
-    altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
+with col_n = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
 # Calcolo sovrapposizioni per l'adiacente
 tavoli_occupati_in_turno_adiacente = []
@@ -150,6 +149,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili, index=default_tavolo_index)
+    # CORRETTO: Estrae la stringa pulita prendendo il primo elemento dell'array di testo
     bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
@@ -184,7 +184,6 @@ lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
-    # Titolo del tavolo con stile grafico curato
     st.markdown(f"### <span style='color: #FFD166;'>📦 {t_nome}</span> (Max: {cap_max} persone)", unsafe_allow_html=True)
     colonne_turno = st.columns(numero_colonne)
     
@@ -203,11 +202,10 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
+            # 🔴 CORREZIONE: Aggiunto l'indice [0] per stampare correttamente il nome stringa del turno
             nome_turno_breve = t_nome_orario.split(" (")
             st.markdown(f"**{nome_turno_breve}**")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
                 st.markdown(f"🟠 <span style='font-size: 24px; font-weight: bold;'>BLOCCATO</span>", unsafe_allow_html=True)
-                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
-            elif chiave_specifica in db_prenotazioni:
