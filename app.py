@@ -63,10 +63,7 @@ def salva_database(db):
 
 db_prenotazioni = carica_database()
 
-
-# =========================================================================
-# 📊 PANNELLO STATISTICHE ISOLATO NELLA BARRA LATERALE (A SINISTRA)
-# =========================================================================
+# --- PANNELLO STATISTICHE ---
 st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
 st.sidebar.header("📊 Statistikpanel")
 
@@ -113,8 +110,6 @@ elif tipo_stat == "Hela året":
 
 st.sidebar.metric(label="👥 Totalt antal gäster:", value=f"{totale_ospiti_calcolato} st")
 st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
-# =========================================================================
-
 
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
@@ -127,7 +122,6 @@ if data_selezionata.strftime("%A") == "Monday":
 
 TURNI = ottieni_turni_del_giorno(data_selezionata)
 
-# Configurazione fissa dei tavoli (2 o 4 posti)
 TAVOLI_MAPPATURA = {}
 for i in range(1, 4):   TAVOLI_MAPPATURA[f"Bord {i}"] = 2
 for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
@@ -148,7 +142,7 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergie o richieste speciali per questa prenotazione:**")
+st.markdown("**Allergier o richieste speciali per questa prenotazione:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
@@ -157,7 +151,6 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
-# Calcolo sovrapposizioni per il menu a tendina dinamico della prenotazione
 tavoli_occupati_in_turno_adiacente = []
 turno_adiacente = None
 if giorno_sett == 6:
@@ -183,7 +176,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -204,13 +197,20 @@ if bord_disponibili:
 else:
     st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
-
-# --- 🪟 INTERFACCIA ORIGINALE: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 INTERFACCIA GIORNALIERA ---
 st.header("🪟 Tabellone Stato di Oggi: " + str(data_selezionata.strftime('%d/%m/%Y')))
 
-# Creiamo le colonne per ogni turno presente nella giornata attuale
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
-# Creiamo una riga per ogni tavolo della pizzeria
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
+    st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
+    colonne_turno = st.columns(numero_colonne)
+    for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
+        with colonne_turno[indice]:
+            t_bloccato = False
+            t_adiacente_local = None
+            if giorno_sett == 6:
+                if "Pranzo - Turno 1" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 2 (13:00 - 15:00)"
+                elif "Pranzo - Turno 2" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 1 (12:00 - 14:00)"
+            elif giorno_sett in (4, 5):
