@@ -11,7 +11,7 @@ DB_FILE = "stato_bord.json"
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 6=Domenica
     
-    if giorno_settimana == 6:  # DOMENICA: Turni sfalsati a pranzo
+    if giorno_settimana == 6:  # DOMENICA: Turni pranzo speciali (12:00 e 13:00)
         return {
             "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
@@ -74,32 +74,36 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
-# Configurazione completa dei tavoli della pizzeria
-TAVOLI_CONFIG = {}
-for i in range(1, 4):   TAVOLI_CONFIG[f"Bord {i}"] = 2
-for i in range(4, 11):  TAVOLI_CONFIG[f"Bord {i}"] = 4
-
-# Logica di ottimizzazione per la DOMENICA A PRANZO per evitare sovrapposizioni
-tavoli_filtrati_per_turno = TAVOLI_CONFIG.copy()
-is_domenica = data_selezionata.weekday() == 6
-
-if is_domenica and "Lunch - Skift 1" in turno_selezionato:
-    # Solo tavoli DISPARI per il turno delle 12:00
-    tavoli_filtrati_per_turno = {k: v for k, v in TAVOLI_CONFIG.items() if int(k.split()[1]) % 2 != 0}
-elif is_domenica and "Lunch - Skift 2" in turno_selezionato:
-    # Solo tavoli PARI per il turno delle 13:00
-    tavoli_filtrati_per_turno = {k: v for k, v in TAVOLI_CONFIG.items() if int(k.split()[1]) % 2 == 0}
-
+# Inizializzazione pulita di TUTTI i 10 tavoli per la giornata corrente
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
-if turno_selezionato not in dati_generali[data_chiave]:
-    # Inizializza il turno nel database usando la configurazione filtrata o totale
-    sala_turno = {nome: {"stato": "Libero", "max_cap": cap, "cliente": "", "tel": ""} for nome, cap in tavoli_filtrati_per_turno.items()}
-    dati_generali[data_chiave][turno_selezionato] = sala_turno
-    salva_bord(dati_generali)
+for t_nome in TURNI.keys():
+    if t_nome not in dati_generali[data_chiave]:
+        sala_turno = {f"Bord {i}": {"stato": "Libero", "max_cap": 2, "cliente": "", "tel": ""} for i in range(1, 4)}
+        sala_turno.update({f"Bord {i}": {"stato": "Libero", "max_cap": 4, "cliente": "", "tel": ""} for i in range(4, 11)})
+        dati_generali[data_chiave][t_nome] = sala_turno
+
+salva_bord(dati_generali)
 
 bord_attuali = dati_generali[data_chiave][turno_selezionato]
+is_domenica = data_selezionata.weekday() == 6
+
+# CONTROLLO INCROCIATO INTELLIGENTE SOLO PER LA DOMENICA A PRANZO
+tavoli_bloccati_da_sovrapposizione = []
+turno_adiacente = None
+
+if is_domenica:
+    if "Lunch - Skift 1" in turno_selezionato:
+        turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
+    elif "Lunch - Skift 2" in turno_selezionato:
+        turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
+    
+    if turno_adiacente and turno_adiacente in dati_generali[data_chiave]:
+        # Un tavolo si blocca in questo turno SOLO SE è effettivamente già stato OCCUPATO nell'altro turno pranzo
+        tavoli_bloccati_da_sovrapposizione = [
+            k for k, v in dati_generali[data_chiave][turno_adiacente].items() if v["stato"] == "Occupato"
+        ]
 
 st.header("📌 Registrera ny bokning")
 col1, col2, col3 = st.columns(3)
@@ -111,9 +115,10 @@ with col2:
 with col3:
     persone = st.number_input("Antal personer", min_value=1, max_value=4, value=2)
 
+# Popoliamo i tavoli disponibili per la prenotazione
 bord_disponibili = []
 for nome, dati in bord_attuali.items():
-    if dati["stato"] == "Libero":
+    if dati["stato"] == "Libero" and nome not in tavoli_bloccati_da_sovrapposizione:
         if persone <= 2 and dati["max_cap"] == 2:
             bord_disponibili.append(f"{nome} (2 pers)")
         elif persone > 2 and dati["max_cap"] == 4:
@@ -142,15 +147,17 @@ else:
 
 st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')} - {turno_selezionato}")
 
-if is_domenica and "Lunch" in turno_selezionato:
-    st.info("💡 Söndagsoptimering aktiverad: Salen är uppdelad i jämna/udda bord för att hantera överlappande tider (12:00 och 13:00).")
-
 for nome, dati in bord_attuali.items():
     col_bord, col_azione = st.columns(2)
     cap_testo = f"{dati['max_cap']} pers"
     
     with col_bord:
-        if dati["stato"] == "Libero":
+        if nome in tavoli_bloccati_da_sovrapposizione:
+            # Il tavolo mostra chi lo sta occupando nell'altro turno sovrapposto
+            info_altro_turno = dati_generali[data_chiave][turno_adiacente][nome]
+            st.markdown(f"🟠 <span style='color: #FF5722; font-size: 24px; font-weight: bold;'>{nome}</span> ({cap_testo}) | BLOCKERAT (Bokat i det andra lunchskiftet)", unsafe_allow_html=True)
+            st.write(f"👉 Gäst: {info_altro_turno['cliente']} ({info_altro_turno['tel']})")
+        elif dati["stato"] == "Libero":
             st.markdown(f"🟢 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> ({cap_testo}) | TILLGÄNGLIGT", unsafe_allow_html=True)
         else:
             info_cliente = f"Gäst: {dati.get('cliente', '')} ({dati.get('tel', '')})"
@@ -158,9 +165,12 @@ for nome, dati in bord_attuali.items():
             st.write(f"👉 {info_cliente}")
             
     with col_azione:
-        if dati["stato"] == "Occupato" and st.button("Frigör bord", key=f"free_{nome}_{turno_selezionato}"):
+        if nome in tavoli_bloccati_da_sovrapposizione:
+            st.write("🔒 *Hantera bokningen via det andra skiftet*")
+        elif dati["stato"] == "Occupato" and st.button("Frigör bord", key=f"free_{nome}_{turno_selezionato}"):
             bord_attuali[nome] = {"stato": "Libero", "max_cap": dati["max_cap"], "cliente": "", "tel": ""}
             dati_generali[data_chiave][turno_selezionato] = bord_attuali
             salva_bord(dati_generali)
             st.rerun()
+            
     st.markdown("<hr style='margin: 8px 0; border: 0.5px solid #333;'>", unsafe_allow_html=True)
