@@ -107,13 +107,15 @@ with col2:
 with col3:
     persone = st.number_input("Numero di Persone", min_value=1, max_value=4, value=2)
 
-st.markdown("**Allergier o richieste speciali per questa prenotazione:**")
+st.markdown("**Allergie o richieste speciali per questa prenotazione:**")
 col_g, col_l, col_n = st.columns(3)
 with col_g:
     glutine = st.checkbox("Intolleranza al Glutine (Senza Glutine)")
 with col_l:
     lattosio = st.checkbox("Intolleranza al Lattosio (Senza Lattosio)")
-with col_n = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
+with col_n:
+    # 🔴 CORRETTO: Sostituito l'errore di sintassi "=" con ":"
+    altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
 # Calcolo sovrapposizioni per l'adiacente
 tavoli_occupati_in_turno_adiacente = []
@@ -149,8 +151,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili, index=default_tavolo_index)
-    # CORRETTO: Estrae la stringa pulita prendendo il primo elemento dell'array di testo
-    bord_scelto = bord_scelto_completo.split(" (")
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -202,8 +203,8 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE: Aggiunto l'indice [0] per stampare correttamente il nome stringa del turno
-            nome_turno_breve = t_nome_orario.split(" (")
+            # 🔴 CORREZIONE DEFINITIVA SPLIT: Estrae in modo sicuro la stringa del nome turno breve
+            nome_turno_breve = t_nome_orario.split(" (")[0]
             st.markdown(f"**{nome_turno_breve}**")
             
             if t_bloccato:
