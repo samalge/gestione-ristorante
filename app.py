@@ -153,7 +153,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index, key=f"sel_bord_{st.session_state['form_reset_id']}")
-    # 🔴 FIX DEFINITIVO: aggiunto [0] per prendere solo la stringa pura "Bord X"
+    # 🔴 CORREZIONE RIGIDA: aggiunto l'indice [0] per prendere solo la stringa di testo ed evitare il crash delle liste
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -206,9 +206,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 FIX DEFINITIVO: aggiunto [0] per stampare la stringa pulita del turno a schermo
+            # 🔴 CORREZIONE RIGIDA: aggiunto l'indice [0] per stampare correttamente la stringa stringa del turno
             nome_turno_breve = t_nome_orario.split(" (")[0]
             
             st.markdown(f"**{nome_turno_breve}**")
-            st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
-            
