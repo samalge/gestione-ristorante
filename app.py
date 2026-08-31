@@ -24,28 +24,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # DOMENICA
         return {
-            "Pranzo - Turno 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Pranzo - Turno 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00"},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
     elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
         return {
-            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
-            "Cena - Turno 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
+            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"},
+            "Cena - Turno 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00"}
         }
     else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
         return {
-            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Pranzo - Turno 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
+            "Pranzo - Turno 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
+            "Cena - Turno 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
+            "Cena - Turno 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
+            "Cena - Turno 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
 
 def carica_database():
@@ -65,7 +65,7 @@ db_prenotazioni = carica_database()
 
 
 # =========================================================================
-# 📊 BLOCCO ISOLATO: PANNELLO STATISTICHE NELLA BARRA LATERALE (A SINISTRA)
+# 📊 PANNELLO STATISTICHE NELLA BARRA LATERALE (A SINISTRA)
 # =========================================================================
 st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
 st.sidebar.header("📊 Statistikpanel")
@@ -211,6 +211,10 @@ st.header("🪟 Tabellone Stato di Oggi: " + str(data_selezionata.strftime('%d/%
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
-# 🔴 ALLINEAMENTO RIGIDO A 4 SPAZI PER TUTTI I COMPONENTI SOTTOSTANTI
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
+    colonne_turno = st.columns(numero_colonne)
+    for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
+        with colonne_turno[indice]:
+            t_bloccato = False
+            t_adiacente_local = None
