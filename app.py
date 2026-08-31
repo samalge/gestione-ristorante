@@ -69,7 +69,7 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
-# CORREZIONE FONDAMENTALE: Inizializza i turni salvaguardando i dati già esistenti
+# Inizializzazione pulita e sicura per i turni del giorno selezionato
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
@@ -79,22 +79,21 @@ for t_nome in TURNI.keys():
         sala_turno.update({f"Bord {i}": {"stato": "Libero", "max_cap": 4, "cliente": "", "tel": "", "note": ""} for i in range(4, 11)})
         dati_generali[data_chiave][t_nome] = sala_turno
 
-# Salviamo solo se abbiamo aggiunto nuove strutture vuote
 salva_bord(dati_generali)
 
 bord_attuali = dati_generali[data_chiave][turno_selezionato]
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI (Domenica pranzo & Venerdì/Sabato sera)
+# CALCOLO DELLE SOVRAPPOSIZIONI GLOBALI
 tavoli_bloccati_da_sovrapposizione = []
 turno_adiacente = None
 
-if giorno_sett == 6:  # Domenica mattina sfalsata
+if giorno_sett == 6:  # Domenica mattina
     if "Lunch - Skift 1" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
     elif "Lunch - Skift 2" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
-elif giorno_sett in (4, 5):  # Venerdì e Sabato sera sfalsati
+elif giorno_sett in (4, 5):  # Venerdì e Sabato sera
     if "Middag - Skift 3" in turno_selezionato:
         turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
     elif "Middag - Skift 4" in turno_selezionato:
@@ -134,7 +133,8 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0] # Corretto l'indice di split per estrarre la stringa pura
+    # RISOLTO: Ora prende la stringa pulita ("Bord 1") ed evita salvataggi corrotti in formato lista
+    bord_scelto = bord_scelto_completo.split(" (")[0] 
     
     if st.button("Boka valt bord"):
         if not cognome:
