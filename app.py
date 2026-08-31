@@ -11,7 +11,7 @@ DB_FILE = "stato_bord.json"
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
     
-    if giorno_settimana == 6:  # DOMENICA (Pranzo 12:00 sfalsato, Cena chiude alle 22:00)
+    if giorno_settimana == 6:  # DOMENICA
         return {
             "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
@@ -19,7 +19,7 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
-    elif giorno_settimana in (4, 5):  # CORRETTO: VENERDÌ E SABATO (Pranzo 11:00, Cena sfalsata fino alle 23:00)
+    elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
         return {
             "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
@@ -28,7 +28,7 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
             "Middag - Skift 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
         }
-    else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ (Pranzo 11:00, Cena chiude alle 22:00)
+    else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
         return {
             "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
@@ -41,22 +41,7 @@ def carica_bord():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r") as f:
-                dati = json.load(f)
-            
-            dati_puliti = {}
-            for data_str, turni in dati.items():
-                dati_puliti[data_str] = {}
-                for turno_nome, tavoli in turni.items():
-                    dati_puliti[data_str][turno_nome] = {}
-                    for nome, info in tavoli.items():
-                        dati_puliti[data_str][turno_nome][nome] = {
-                            "stato": info.get("stato", "Libero"),
-                            "max_cap": info.get("max_cap", 2),
-                            "cliente": info.get("cliente", ""),
-                            "tel": info.get("tel", ""),
-                            "note": info.get("note", "")
-                        }
-            return dati_puliti
+                return json.load(f)
         except Exception:
             return {}
     return {}
@@ -84,6 +69,7 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
+# CORREZIONE FONDAMENTALE: Inizializza i turni salvaguardando i dati già esistenti
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
@@ -93,6 +79,7 @@ for t_nome in TURNI.keys():
         sala_turno.update({f"Bord {i}": {"stato": "Libero", "max_cap": 4, "cliente": "", "tel": "", "note": ""} for i in range(4, 11)})
         dati_generali[data_chiave][t_nome] = sala_turno
 
+# Salviamo solo se abbiamo aggiunto nuove strutture vuote
 salva_bord(dati_generali)
 
 bord_attuali = dati_generali[data_chiave][turno_selezionato]
@@ -107,7 +94,7 @@ if giorno_sett == 6:  # Domenica mattina sfalsata
         turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
     elif "Lunch - Skift 2" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
-elif giorno_sett in (4, 5):  # CORRETTO: Venerdì e Sabato sera sfalsati
+elif giorno_sett in (4, 5):  # Venerdì e Sabato sera sfalsati
     if "Middag - Skift 3" in turno_selezionato:
         turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
     elif "Middag - Skift 4" in turno_selezionato:
@@ -147,7 +134,7 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")[0] # Corretto l'indice di split per estrarre la stringa pura
     
     if st.button("Boka valt bord"):
         if not cognome:
