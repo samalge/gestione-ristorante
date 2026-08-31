@@ -24,28 +24,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # DOMENICA
         return {
-            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Lunch - Turno 1 (12:00 - 14:00)": {"inizio": time(12, 0), "fine": time(14, 0)},
+            "Lunch - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Middag - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Middag - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Middag - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
     elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
-            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
+            "Lunch - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
+            "Lunch - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Middag - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Middag - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Middag - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)},
+            "Middag - Turno 4 (21:00 - 23:00)": {"inizio": time(21, 0), "fine": time(23, 0)}
         }
     else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
+            "Lunch - Turno 1 (11:00 - 13:00)": {"inizio": time(11, 0), "fine": time(13, 0)},
+            "Lunch - Turno 2 (13:00 - 15:00)": {"inizio": time(13, 0), "fine": time(15, 0)},
+            "Middag - Turno 1 (16:00 - 18:00)": {"inizio": time(16, 0), "fine": time(18, 0)},
+            "Middag - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
+            "Middag - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
 
 def carica_bord():
@@ -80,11 +80,9 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
-# Inizializzazione pulita se il giorno non esiste
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
-# Inizializzazione isolata per OGNI singolo turno della giornata
 for t_nome in TURNI.keys():
     if t_nome not in dati_generali[data_chiave]:
         sala_turno = {f"Bord {i}": {"stato": "Libero", "max_cap": 2, "cliente": "", "tel": "", "note": ""} for i in range(1, 4)}
@@ -93,24 +91,23 @@ for t_nome in TURNI.keys():
 
 salva_bord(dati_generali)
 
-# Usiamo deepcopy per slegare completamente i skift l'uno dall'altro in memoria
 bord_attuali = copy.deepcopy(dati_generali[data_chiave][turno_selezionato])
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI INTELLIGENTI
+# CALCOLO DELLE SOVRAPPOSIZIONI INTELLIGENTI (Domenica pranzo & Venerdì/Sabato sera)
 tavoli_bloccati_da_sovrapposizione = []
 turno_adiacente = None
 
 if giorno_sett == 6:  # Domenica pranzo
-    if "Lunch - Skift 1" in turno_selezionato:
-        turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
-    elif "Lunch - Skift 2" in turno_selezionato:
-        turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
+    if "Lunch - Turno 1" in turno_selezionato:
+        turno_adiacente = "Lunch - Turno 2 (13:00 - 15:00)"
+    elif "Lunch - Turno 2" in turno_selezionato:
+        turno_adiacente = "Lunch - Turno 1 (12:00 - 14:00)"
 elif giorno_sett in (4, 5):  # Venerdì e Sabato sera
-    if "Middag - Skift 3" in turno_selezionato:
-        turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
-    elif "Middag - Skift 4" in turno_selezionato:
-        turno_adiacente = "Middag - Skift 3 (20:00 - 22:00)"
+    if "Middag - Turno 3" in turno_selezionato:
+        turno_adiacente = "Middag - Turno 4 (21:00 - 23:00)"
+    elif "Middag - Turno 4" in turno_selezionato:
+        turno_adiacente = "Middag - Turno 3 (20:00 - 22:00)"
 
 if turno_adiacente and turno_adiacente in dati_generali[data_chiave]:
     tavoli_bloccati_da_sovrapposizione = [
@@ -136,7 +133,7 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Andra önskemål / info (t.ex. Barnstol)", placeholder="Skriv här...")
 
-# Generazione dei tavoli disponibili nel menu
+# Generazione dei tavoli disponibili nel menu a tendina
 bord_disponibili = []
 for nome, dati in bord_attuali.items():
     if dati["stato"] == "Libero" and nome not in tavoli_bloccati_da_sovrapposizione:
@@ -147,7 +144,7 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    # 🔴 CORREZIONE: Aggiunto [0] per prendere il nome pulito ("Bord X") come stringa pura
+    # 🔴 FIX CRUCIALE: Estrae la stringa pura subito (es: "Bord 1") evitandone la duplicazione errata
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -160,7 +157,7 @@ if bord_disponibili:
             if altre_note.strip(): lista_note.append(altre_note.strip())
             nota_finale = " | ".join(lista_note)
             
-            # SALVATAGGIO ISOLATO DIRETTAMENTE SULL'ALBERO GENERALE
+            # Scrittura diretta e pulita nel database generale ad albero
             dati_generali[data_chiave][turno_selezionato][bord_scelto] = {
                 "stato": "Occupato",
                 "max_cap": bord_attuali[bord_scelto]["max_cap"],
