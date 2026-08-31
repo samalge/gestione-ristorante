@@ -150,7 +150,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili, index=default_tavolo_index)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -184,7 +184,8 @@ lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
-    st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
+    # Titolo del tavolo con stile grafico curato
+    st.markdown(f"### <span style='color: #FFD166;'>📦 {t_nome}</span> (Max: {cap_max} persone)", unsafe_allow_html=True)
     colonne_turno = st.columns(numero_colonne)
     
     for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
@@ -202,14 +203,11 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            st.markdown(f"**{t_nome_orario.split(' (')[0]}**")
+            nome_turno_breve = t_nome_orario.split(" (")
+            st.markdown(f"**{nome_turno_breve}**")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                st.markdown("🟠 **BLOCCATO**")
-                st.caption(f"Occupato nel turno adiacente da: {info_blocco['cliente']}")
+                st.markdown(f"🟠 <span style='font-size: 24px; font-weight: bold;'>BLOCCATO</span>", unsafe_allow_html=True)
+                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
             elif chiave_specifica in db_prenotazioni:
-                info_p = db_prenotazioni[chiave_specifica]
-                st.markdown(f"🔴 **OCCUPATO**\n\n👤 **{info_p['cliente']}**\n\n📞 {info_p['tel']}")
-                if info_p.get("note"):
-                    st.caption(f"📝 {info_p['note']}")
