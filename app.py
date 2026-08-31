@@ -217,7 +217,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    # 🔴 CORREZIONE: Estratta la stringa di testo pulita con l'indice [0]
+    # 🔴 RISOLTO: Eliminato il bug dello split
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -227,3 +227,4 @@ if bord_disponibili:
             lista_note = []
             if glutine: lista_note.append("⚠️ GLUTENFRI")
             if lattosio: lista_note.append("⚠️ LAKTOSFRI")
+            if altre_note.strip(): lista_note.append(altre_note.strip())
