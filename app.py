@@ -9,6 +9,51 @@ st.title("Centralino: Prenotazioni Telefoniche")
 
 DB_FILE = "stato_bord.json"
 
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
+
+# =========================================================================
+# 📊 BLOCCO ISOLATO: RIASSUNTO PRENOTAZIONI NELLA BARRA LATERALE (A SINISTRA)
+# =========================================================================
+st.sidebar.header("📊 Riepilogo Prenotazioni")
+
+totale_giorno = 0
+totale_mese = 0
+totale_anno = 0
+
+oggi_dt = datetime.now()
+data_oggi_stringa = oggi_dt.date().isoformat()
+prefisso_mese = oggi_dt.strftime("%Y-%m")
+prefisso_anno = oggi_dt.strftime("%Y-")
+
+for chiave_db in db_prenotazioni.keys():
+    if chiave_db.startswith(data_oggi_stringa):
+        totale_giorno += 1
+    if chiave_db.startswith(prefisso_mese):
+        totale_mese += 1
+    if chiave_db.startswith(prefisso_anno):
+        totale_anno += 1
+
+st.sidebar.metric(label="📆 Tavoli prenotati oggi", value=f"{totale_giorno}")
+st.sidebar.metric(label="🗓️ Totale questo mese", value=f"{totale_mese}")
+st.sidebar.metric(label="👑 Totale questo anno", value=f"{totale_anno}")
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+# =========================================================================
+
+
 # --- STRUMENTO DI RESET ---
 st.sidebar.header("🛠️ Strumenti di Sistema")
 if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotazioni e riparte da zero"):
@@ -20,7 +65,7 @@ if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotaz
     st.rerun()
 
 def ottieni_turni_del_giorno(data_selezionata):
-    giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
+    giorno_settimana = data_selezionata.weekday()
     
     if giorno_settimana == 6:  # DOMENICA
         return {
@@ -48,21 +93,6 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
 
-def carica_database():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
-
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
 data_selezionata = st.date_input("Scegli il giorno:", value=oggi_completo.date())
@@ -78,8 +108,6 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 TAVOLI_MAPPATURA = {}
 for i in range(1, 4):   TAVOLI_MAPPATURA[f"Bord {i}"] = 2
 for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
-
-giorno_sett = data_selezionata.weekday()
 
 # --- BLOCCO PRENOTAZIONE ---
 st.header("📌 Inserisci Nuova Prenotazione")
@@ -104,25 +132,10 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
-# Calcolo sovrapposizioni per il menu a tendina dinamico della prenotazione
-tavoli_occupati_in_turno_adiacente = []
-turno_adiacente = None
-if giorno_sett == 6:
-    if "Pranzo - Turno 1" in turno_selezionato: turno_adiacente = "Pranzo - Turno 2 (13:00 - 15:00)"
-    elif "Pranzo - Turno 2" in turno_selezionato: turno_adiacente = "Pranzo - Turno 1 (12:00 - 14:00)"
-elif giorno_sett in (4, 5):
-    if "Cena - Turno 3" in turno_selezionato: turno_adiacente = "Cena - Turno 4 (21:00 - 23:00)"
-    elif "Cena - Turno 4" in turno_selezionato: turno_adiacente = "Cena - Turno 3 (20:00 - 22:00)"
-
-if turno_adiacente:
-    for t_nome in TAVOLI_MAPPATURA.keys():
-        if f"{data_chiave}|{turno_adiacente}|{t_nome}" in db_prenotazioni:
-            tavoli_occupati_in_turno_adiacente.append(t_nome)
-
 bord_disponibili = []
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     chiave_corrente = f"{data_chiave}|{turno_selezionato}|{t_nome}"
-    if chiave_corrente not in db_prenotazioni and t_nome not in tavoli_occupati_in_turno_adiacente:
+    if chiave_corrente not in db_prenotazioni:
         if persone <= 2 and cap_max == 2:
             bord_disponibili.append(f"{t_nome} (2 pers)")
         elif persone > 2 and cap_max == 4:
@@ -130,7 +143,6 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    # 🔴 FIX CRITICO: Aggiunto l'indice [0] per salvare il nome pulito ed evitare la corruzione delle chiavi
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Conferma Prenotazione Tavolo"):
@@ -153,44 +165,22 @@ else:
     st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
 
-# --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header("🪟 Tabellone Stato di Oggi: " + str(data_selezionata.strftime('%d/%m/%Y')))
 
-# Creiamo le colonne per ogni turno presente nella giornata attuale
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
-# Creiamo una riga per ogni tavolo della pizzeria
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
-    
-    # Allineiamo i turni in orizzontale su colonne distinte
     colonne_turno = st.columns(numero_colonne)
     
     for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
         with colonne_turno[indice]:
-            # Controlliamo la sovrapposizione locale per questo specifico turno
-            t_bloccato = False
-            t_adiacente_local = None
-            if giorno_sett == 6:
-                if "Pranzo - Turno 1" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 2 (13:00 - 15:00)"
-                elif "Pranzo - Turno 2" in t_nome_orario: t_adiacente_local = "Pranzo - Turno 1 (12:00 - 14:00)"
-            elif giorno_sett in (4, 5):
-                if "Cena - Turno 3" in t_nome_orario: t_adiacente_local = "Cena - Turno 4 (21:00 - 23:00)"
-                elif "Cena - Turno 4" in t_nome_orario: t_adiacente_local = "Cena - Turno 3 (20:00 - 22:00)"
-            
-            if t_adiacente_local and f"{data_chiave}|{t_adiacente_local}|{t_nome}" in db_prenotazioni:
-                t_bloccato = True
-
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            
             st.markdown(f"**{t_nome_orario}**")
             
-            if t_bloccato:
-                info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                st.markdown("🟠 BLOCCATO")
-                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
-            elif chiave_specifica in db_prenotazioni:
+            if chiave_specifica in db_prenotazioni:
                 info_p = db_prenotazioni[chiave_specifica]
                 st.markdown("🔴 OCCUPATO")
                 st.write(f"👤 **{info_p['cliente']}**")
