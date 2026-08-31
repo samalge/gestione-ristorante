@@ -9,7 +9,7 @@ st.title("Centralen: Telefonbokning")
 
 DB_FILE = "stato_bord.json"
 
-# --- STRUMENTO DI RESET PROTETTO DA PASSWORD ---
+# --- Systemverktyg med lösenordsskydd ---
 st.sidebar.header("🛠️ Systemverktyg")
 psw_input = st.sidebar.text_input("Ange säkerhetslösenord:", type="password")
 
@@ -25,9 +25,9 @@ if st.sidebar.button("⚠️ NOLLSTÄLL DATABASEN", help="Klicka här för att r
         st.sidebar.error("❌ Felaktigt lösenord! Åtkomst nekad.")
 
 def ottieni_turni_del_giorno(data_selezionata):
-    giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
+    giorno_settimana = data_selezionata.weekday() # 0=Måndag, 4=Fredag, 5=Lördag, 6=Söndag
     
-    if giorno_settimana == 6:  # DOMENICA
+    if giorno_settimana == 6:  # SÖNDAG
         return {
             "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00"},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
@@ -35,7 +35,7 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
-    elif giorno_settimana in (4, 5):  # VENERDÌ E SABATO
+    elif giorno_settimana in (4, 5):  # FREDAG OCH LÖRDAG
         return {
             "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
@@ -44,7 +44,7 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"},
             "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00"}
         }
-    else:  # MARTEDÌ, MERCOLEDÌ, GIOVEDÌ
+    else:  # TISDAG, ONSDAG, TORSDAG
         return {
             "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
             "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
@@ -79,20 +79,19 @@ if data_selezionata.strftime("%A") == "Monday":
 
 TURNI = ottieni_turni_del_giorno(data_selezionata)
 
-# Configurazione fissa dei tavoli (2 o 4 posti)
+# Bordskonfiguration (10 bord)
 TAVOLI_MAPPATURA = {}
 for i in range(1, 4):   TAVOLI_MAPPATURA[f"Bord {i}"] = 2
 for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
 
 giorno_sett = data_selezionata.weekday()
 
-# --- BLOCCO PRENOTAZIONE ---
+# --- Ny bokning ---
 st.header("📌 Registrera ny bokning")
 col_turno_sel, col1, col2, col3 = st.columns(4)
 
 lista_turni_disponibili = list(TURNI.keys())
 
-# Recuperiamo lo skift se selezionato via click dal tabellone inferiore
 default_turno_index = 0
 if "pre_turno" in st.session_state and st.session_state["pre_turno"] in lista_turni_disponibili:
     default_turno_index = lista_turni_disponibili.index(st.session_state["pre_turno"])
@@ -116,7 +115,7 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Andra önskemål (t.ex. Barnstol)", placeholder="Skriv här...")
 
-# Calcolo sovrapposizioni per bloccare la scelta adiacente nel menu a tendina
+# Hantering av överlappande tider
 tavoli_occupati_in_turno_adiacente = []
 turno_adiacente = None
 if giorno_sett == 6:
@@ -140,7 +139,6 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
         elif persone > 2 and cap_max == 4:
             bord_disponibili.append(f"{t_nome} (4 pers)")
 
-# Recuperiamo l'indice del tavolo se preselezionato cliccando dal tabellone
 default_tavolo_index = 0
 if "pre_tavolo" in st.session_state:
     testo_cercato = f"{st.session_state['pre_tavolo']} (2 pers)" if TAVOLI_MAPPATURA.get(st.session_state['pre_tavolo']) == 2 else f"{st.session_state['pre_tavolo']} (4 pers)"
@@ -149,7 +147,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    # 🔴 CORREZIONE RIGIDA: Estratta la stringa pura usando l'indice [0]
+    # 🔴 CORREZIONE RIGA 138: Estratta la stringa pura usando [0]
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -176,7 +174,7 @@ else:
     st.warning("⚠️ Inga passande bord är tillgängliga under detta skift.")
 
 
-# --- 🪟 INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 Matsalens status (Tabellöversikt) ---
 st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')}")
 
 lista_turni_del_giorno = list(TURNI.keys())
@@ -201,7 +199,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE RIGIDA: Estratta la stringa pura del turno usando l'indice [0]
+            # 🔴 CORREZIONE RIGA 191: Estratta la stringa pura usando [0]
             nome_turno_breve = t_nome_orario.split(" (")[0]
             
             st.markdown(f"**{nome_turno_breve}**")
@@ -213,3 +211,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 st.caption(f"Bokat i nästa skift: {info_blocco['cliente']}")
             elif chiave_specifica in db_prenotazioni:
                 info_p = db_prenotazioni[chiave_specifica]
+                st.markdown("🔴 <span style='color: #D32F2F; font-size: 20px; font-weight: bold;'>BOKAT</span>", unsafe_allow_html=True)
+                st.write(f"👤 **{info_p['cliente']}**")
+                st.write(f"📞 {info_p['tel']}")
+                if info_p.get("note"):
+                    st.caption(f"📝 {info_p['note']}")
+                
