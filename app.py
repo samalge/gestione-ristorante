@@ -9,15 +9,20 @@ st.title("Centralino: Prenotazioni Telefoniche")
 
 DB_FILE = "stato_bord.json"
 
-# --- STRUMENTO DI RESET ---
+# --- STRUMENTO DI RESET PROTETTO DA PASSWORD ---
 st.sidebar.header("🛠️ Strumenti di Sistema")
+psw_input = st.sidebar.text_input("Inserisci Password di Sicurezza:", type="password")
+
 if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotazioni e riparte da zero"):
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-        st.sidebar.success("✅ Database resettato! Riavvio...")
+    if psw_input == "Samuelmark123#":
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+            st.sidebar.success("✅ Database resettato! Riavvio...")
+        else:
+            st.sidebar.info("Il database è già vuoto.")
+        st.rerun()
     else:
-        st.sidebar.info("Il database è già vuoto.")
-    st.rerun()
+        st.sidebar.error("❌ Password errata! Accesso negato.")
 
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
@@ -85,8 +90,15 @@ giorno_sett = data_selezionata.weekday()
 st.header("📌 Inserisci Nuova Prenotazione")
 col_turno_sel, col1, col2, col3 = st.columns(4)
 
+lista_turni_disponibili = list(TURNI.keys())
+
+# Recuperiamo l'indice del turno se preselezionato cliccando dal tabellone
+default_turno_index = 0
+if "pre_turno" in st.session_state and st.session_state["pre_turno"] in lista_turni_disponibili:
+    default_turno_index = lista_turni_disponibili.index(st.session_state["pre_turno"])
+
 with col_turno_sel:
-    turno_selezionato = st.selectbox("In quale turno inserire:", list(TURNI.keys()))
+    turno_selezionato = st.selectbox("In quale turno inserire:", lista_turni_disponibili, index=default_turno_index)
 
 with col1:
     cognome = st.text_input("Cognome Cliente", placeholder="es. Rossi").strip()
@@ -104,7 +116,7 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
-# Calcolo sovrapposizioni per il menu a tendina dinamico della prenotazione
+# Calcolo sovrapposizioni per l'adiacente
 tavoli_occupati_in_turno_adiacente = []
 turno_adiacente = None
 if giorno_sett == 6:
@@ -119,6 +131,7 @@ if turno_adiacente:
         if f"{data_chiave}|{turno_adiacente}|{t_nome}" in db_prenotazioni:
             tavoli_occupati_in_turno_adiacente.append(t_nome)
 
+# Popolamento lista tavoli liberi
 bord_disponibili = []
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     chiave_corrente = f"{data_chiave}|{turno_selezionato}|{t_nome}"
@@ -128,9 +141,16 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
         elif persone > 2 and cap_max == 4:
             bord_disponibili.append(f"{t_nome} (4 pers)")
 
+# Determina l'indice di default se il tavolo è stato cliccato dal tabellone
+default_tavolo_index = 0
+if "pre_tavolo" in st.session_state:
+    testo_cercato = f"{st.session_state['pre_tavolo']} (2 pers)" if TAVOLI_MAPPATURA.get(st.session_state['pre_tavolo']) == 2 else f"{st.session_state['pre_tavolo']} (4 pers)"
+    if testo_cercato in bord_disponibili:
+        default_tavolo_index = bord_disponibili.index(testo_cercato)
+
 if bord_disponibili:
-    bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili, index=default_tavolo_index)
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -146,29 +166,29 @@ if bord_disponibili:
             chiave_salvataggio = f"{data_chiave}|{turno_selezionato}|{bord_scelto}"
             db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
             salva_database(db_aggiornato)
+            
+            # Puliamo lo stato temporaneo dopo il salvataggio
+            if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
+            if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
+            
             st.success(f"✅ Prenotazione salvata per {bord_scelto} nel turno {turno_selezionato}!")
             st.rerun()
 else:
     st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
 
-# --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header(f"🪟 Tabellone Stato di Oggi: {data_selezionata.strftime('%d/%m/%Y')}")
 
-# Creiamo le colonne per ogni turno presente nella giornata attuale
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
-# Creiamo una riga per ogni tavolo della pizzeria
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
-    
-    # Allineiamo i turni in orizzontale su colonne distinte
     colonne_turno = st.columns(numero_colonne)
     
     for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
         with colonne_turno[indice]:
-            # Controlliamo la sovrapposizione locale per questo specifico turno
             t_bloccato = False
             t_adiacente_local = None
             if giorno_sett == 6:
@@ -182,8 +202,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            
-            st.markdown(f"**{t_nome_orario.split(' (')[0]}**") # Nome breve (es: Pranzo - Turno 1)
+            st.markdown(f"**{t_nome_orario.split(' (')}**")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
@@ -193,16 +212,3 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 info_p = db_prenotazioni[chiave_specifica]
                 st.markdown(f"🔴 **OCCUPATO**\n\n👤 **{info_p['cliente']}**\n\n📞 {info_p['tel']}")
                 if info_p.get("note"):
-                    st.caption(f"📝 {info_p['note']}")
-                
-                # 🔴 CORREZIONE: Parametro size="small" rimosso per compatibilità standard con Streamlit
-                if st.button("Libera", key=f"del_{chiave_specifica}"):
-                    db_cancella = carica_database()
-                    if chiave_specifica in db_cancella:
-                        del db_cancella[chiave_specifica]
-                        salva_database(db_cancella)
-                    st.rerun()
-            else:
-                st.markdown("🟢 **LIBERO**")
-                
-    st.markdown("<hr style='margin: 12px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
