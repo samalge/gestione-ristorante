@@ -149,7 +149,8 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    bord_scelto = bord_scelto_completo.split(" (")
+    # 🔴 FIX CRUCIAL: Aggiunto [0] per prendere solo il testo "Bord X" ed evitare il bug delle liste
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
         if not cognome:
@@ -200,9 +201,9 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            nome_turno_breve = t_nome_orario.split(" (")
+            # 🔴 FIX VISIVO: Aggiunto [0] per stampare correttamente il titolo stringa del turno senza crash
+            nome_turno_breve = t_nome_orario.split(" (")[0]
             
-            # Mostra il nome dello skift e sotto gli orari di inizio e fine estratti dal dizionario
             st.markdown(f"**{nome_turno_breve}**")
             st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
             
@@ -212,5 +213,3 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 st.caption(f"Bokat i nästa skift: {info_blocco['cliente']}")
             elif chiave_specifica in db_prenotazioni:
                 info_p = db_prenotazioni[chiave_specifica]
-                st.markdown("🔴 <span style='color: #D32F2F; font-size: 20px; font-weight: bold;'>BOKAT</span>", unsafe_allow_html=True)
-                st.write(f"👤 **{info_p['cliente']}**")
