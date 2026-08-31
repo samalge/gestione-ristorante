@@ -2033,4 +2033,3 @@ else:
             st.info(
                 "Nessuna prenotazione per questo anno."
             )
-```
