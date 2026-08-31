@@ -1,5 +1,7 @@
 import streamlit as st
-from datetime import datetime, json, os, time
+from datetime import datetime, time
+import json
+import os
 
 st.set_page_config(page_title="Bordshantering Restaurang", layout="wide")
 st.title("Centralen: Telefonbokning")
