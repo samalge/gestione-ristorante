@@ -92,7 +92,7 @@ col_turno_sel, col1, col2, col3 = st.columns(4)
 
 lista_turni_disponibili = list(TURNI.keys())
 
-# Recuperiamo l'indice del turno se preselezionato cliccando dal tabellone
+# Intercettiamo se un turno è stato preselezionato cliccando sul tabellone
 default_turno_index = 0
 if "pre_turno" in st.session_state and st.session_state["pre_turno"] in lista_turni_disponibili:
     default_turno_index = lista_turni_disponibili.index(st.session_state["pre_turno"])
@@ -114,10 +114,9 @@ with col_g:
 with col_l:
     lattosio = st.checkbox("Intolleranza al Lattosio (Senza Lattosio)")
 with col_n:
-    # 🔴 CORRETTO: Sostituito l'errore di sintassi "=" con ":"
     altre_note = st.text_input("Note aggiuntive (es. Seggiolone)", placeholder="Scrivi qui...")
 
-# Calcolo sovrapposizioni per l'adiacente
+# Calcolo sovrapposizioni per il menu a tendina dinamico della prenotazione
 tavoli_occupati_in_turno_adiacente = []
 turno_adiacente = None
 if giorno_sett == 6:
@@ -132,7 +131,6 @@ if turno_adiacente:
         if f"{data_chiave}|{turno_adiacente}|{t_nome}" in db_prenotazioni:
             tavoli_occupati_in_turno_adiacente.append(t_nome)
 
-# Popolamento lista tavoli liberi
 bord_disponibili = []
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
     chiave_corrente = f"{data_chiave}|{turno_selezionato}|{t_nome}"
@@ -142,7 +140,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
         elif persone > 2 and cap_max == 4:
             bord_disponibili.append(f"{t_nome} (4 pers)")
 
-# Determina l'indice di default se il tavolo è stato cliccato dal tabellone
+# Intercettiamo se un tavolo è stato preselezionato cliccando sul tabellone
 default_tavolo_index = 0
 if "pre_tavolo" in st.session_state:
     testo_cercato = f"{st.session_state['pre_tavolo']} (2 pers)" if TAVOLI_MAPPATURA.get(st.session_state['pre_tavolo']) == 2 else f"{st.session_state['pre_tavolo']} (4 pers)"
@@ -168,7 +166,7 @@ if bord_disponibili:
             db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
             salva_database(db_aggiornato)
             
-            # Puliamo lo stato temporaneo dopo il salvataggio
+            # Resettiamo la selezione temporanea dopo il salvataggio
             if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
             if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
             
@@ -178,14 +176,14 @@ else:
     st.warning("⚠️ Nessun tavolo disponibile per il numero di persone selezionato in questo turno.")
 
 
-# --- 🪟 INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
+# --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header(f"🪟 Tabellone Stato di Oggi: {data_selezionata.strftime('%d/%m/%Y')}")
 
 lista_turni_del_giorno = list(TURNI.keys())
 numero_colonne = len(lista_turni_del_giorno)
 
 for t_nome, cap_max in TAVOLI_MAPPATURA.items():
-    st.markdown(f"### <span style='color: #FFD166;'>📦 {t_nome}</span> (Max: {cap_max} persone)", unsafe_allow_html=True)
+    st.markdown(f"### 📦 {t_nome} (Capienza max: {cap_max} persone)")
     colonne_turno = st.columns(numero_colonne)
     
     for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
@@ -203,10 +201,12 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE DEFINITIVA SPLIT: Estrae in modo sicuro la stringa del nome turno breve
             nome_turno_breve = t_nome_orario.split(" (")[0]
             st.markdown(f"**{nome_turno_breve}**")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                st.markdown(f"🟠 <span style='font-size: 24px; font-weight: bold;'>BLOCCATO</span>", unsafe_allow_html=True)
+                st.markdown("🟠 <span style='font-size: 24px;'>BLOCCATO</span>", unsafe_allow_html=True)
+                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
+            elif chiave_specifica in db_prenotazioni:
+                info_p = db_prenotazioni[chiave_specifica]
