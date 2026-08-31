@@ -150,7 +150,7 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili, index=default_tavolo_index)
-    bord_scelto = bord_scelto_completo.split(" (")
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -202,7 +202,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            st.markdown(f"**{t_nome_orario.split(' (')}**")
+            st.markdown(f"**{t_nome_orario.split(' (')[0]}**")
             
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
@@ -212,3 +212,4 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 info_p = db_prenotazioni[chiave_specifica]
                 st.markdown(f"🔴 **OCCUPATO**\n\n👤 **{info_p['cliente']}**\n\n📞 {info_p['tel']}")
                 if info_p.get("note"):
+                    st.caption(f"📝 {info_p['note']}")
