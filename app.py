@@ -9,6 +9,16 @@ st.title("Centralen: Telefonbokning")
 
 DB_FILE = "stato_bord.json"
 
+# --- TASTO DI EMERGENZA PER CANCELLARE IL FILE CORROTTO ---
+st.sidebar.header("🛠️ Systemverktyg")
+if st.sidebar.button("⚠️ NOLLSTÄLL DATABASEN (Radera fil)", help="Klicka här för att rensa gamla korrupta bokningar och starta om systemet"):
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE)
+        st.sidebar.success("✅ Filen raderades! Sidan laddas om...")
+    else:
+        st.sidebar.info("Filen fanns inte, databasen är redan tom.")
+    st.rerun()
+
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
     
@@ -70,10 +80,11 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
-# Inizializzazione isolata e sicura di ogni singolo skift nel database
+# Inizializzazione pulita se il giorno non esiste
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
+# Inizializzazione isolata per OGNI singolo turno della giornata
 for t_nome in TURNI.keys():
     if t_nome not in dati_generali[data_chiave]:
         sala_turno = {f"Bord {i}": {"stato": "Libero", "max_cap": 2, "cliente": "", "tel": "", "note": ""} for i in range(1, 4)}
@@ -82,20 +93,20 @@ for t_nome in TURNI.keys():
 
 salva_bord(dati_generali)
 
-# Sganciamo il dizionario corrente usando deepcopy per evitare modifiche fantasma tra i skift
+# Usiamo deepcopy per slegare completamente i skift l'uno dall'altro in memoria
 bord_attuali = copy.deepcopy(dati_generali[data_chiave][turno_selezionato])
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI (Solo per skift parzialmente sovrapposti)
+# CALCOLO DELLE SOVRAPPOSIZIONI INTELLIGENTI
 tavoli_bloccati_da_sovrapposizione = []
 turno_adiacente = None
 
-if giorno_sett == 6:  # Domenica mattina sfalsata
+if giorno_sett == 6:  # Domenica pranzo
     if "Lunch - Skift 1" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
     elif "Lunch - Skift 2" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
-elif giorno_sett in (4, 5):  # Venerdì e Sabato sera sfalsati
+elif giorno_sett in (4, 5):  # Venerdì e Sabato sera
     if "Middag - Skift 3" in turno_selezionato:
         turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
     elif "Middag - Skift 4" in turno_selezionato:
@@ -125,7 +136,7 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Andra önskemål / info (t.ex. Barnstol)", placeholder="Skriv här...")
 
-# Generazione pulita dei tavoli selezionabili nel menu a tendina
+# Generazione dei tavoli disponibili nel menu
 bord_disponibili = []
 for nome, dati in bord_attuali.items():
     if dati["stato"] == "Libero" and nome not in tavoli_bloccati_da_sovrapposizione:
@@ -136,8 +147,7 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    # CORREZIONE SICURA: prende solo il nome del tavolo (es: "Bord 1")
-    bord_scelto = bord_scelto_completo.split(" (")[0] 
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Boka valt bord"):
         if not cognome:
@@ -149,7 +159,7 @@ if bord_disponibili:
             if altre_note.strip(): lista_note.append(altre_note.strip())
             nota_finale = " | ".join(lista_note)
             
-            # Scrittura diretta nel database generale isolato per evitare conflitti
+            # SALVATAGGIO ISOLATO DIRETTAMENTE SULL'ALBERO GENERALE
             dati_generali[data_chiave][turno_selezionato][bord_scelto] = {
                 "stato": "Occupato",
                 "max_cap": bord_attuali[bord_scelto]["max_cap"],
