@@ -114,28 +114,28 @@ def ottieni_turni_del_giorno(data_selezionata):
     
     if giorno_settimana == 6:  # SÖNDAG
         return {
-            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
+            "Lunch - Skift 1 (12:00 - 14:00)": {"inizio": "12:00", "fine": "14:00", "breve": "Lunch - Skift 1"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"}
         }
     elif giorno_settimana in (4, 5):  # FREDAG OCH LÖRDAG
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"},
-            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00"}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"},
+            "Middag - Skift 4 (21:00 - 23:00)": {"inizio": "21:00", "fine": "23:00", "breve": "Middag - Skift 4"}
         }
     else:  # TISDAG, ONSDAG, TORSDAG
         return {
-            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00"},
-            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00"},
-            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00"},
-            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
-            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
+            "Lunch - Skift 1 (11:00 - 13:00)": {"inizio": "11:00", "fine": "13:00", "breve": "Lunch - Skift 1"},
+            "Lunch - Skift 2 (13:00 - 15:00)": {"inizio": "13:00", "fine": "15:00", "breve": "Lunch - Skift 2"},
+            "Middag - Skift 1 (16:00 - 18:00)": {"inizio": "16:00", "fine": "18:00", "breve": "Middag - Skift 1"},
+            "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00", "breve": "Middag - Skift 2"},
+            "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00", "breve": "Middag - Skift 3"}
         }
 
 st.header("📆 Välj datum")
@@ -217,14 +217,3 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    # 🔴 RISOLTO: Eliminato il bug dello split
-    bord_scelto = bord_scelto_completo.split(" (")[0]
-    
-    if st.button("Boka valt bord"):
-        if not cognome:
-            st.error("⚠️ Vänligen fyll i kundens efternamn innan du sparar.")
-        else:
-            lista_note = []
-            if glutine: lista_note.append("⚠️ GLUTENFRI")
-            if lattosio: lista_note.append("⚠️ LAKTOSFRI")
-            if altre_note.strip(): lista_note.append(altre_note.strip())
