@@ -9,7 +9,80 @@ st.title("Centralen: Telefonbokning")
 
 DB_FILE = "stato_bord.json"
 
-# --- Systemverktyg med lösenordsskydd ---
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
+# --- 📊 NUOVO PANNELLO STATISTICHE NELLA BARRA LATERALE ---
+st.sidebar.header("📊 Statistikpanel")
+
+# Menu a tendina per scegliere il tipo di visualizzazione richiesta
+tipo_stat = st.sidebar.selectbox(
+    "Välj statistikvy:",
+    ["Specifik dag", "Hel månad", "Hela året"]
+)
+
+totale_ospiti_calcolato = 0
+
+if tipo_stat == "Specifik dag":
+    giorno_stat = st.sidebar.date_input("Välj dag för statistik:", value=datetime.now().date(), key="stat_day")
+    chiave_giorno_stat = giorno_stat.isoformat()
+    
+    # Scorriamo il database cercando le chiavi che iniziano con la data selezionata
+    for chiave, info in db_prenotazioni.items():
+        if chiave.startswith(chiave_giorno_stat):
+            # Nel database non salvavamo il numero esatto come intero, lo estraiamo se presente
+            # Se la struttura non ha salvato il numero, usiamo una stima prudente basata sul tavolo o 2 come default
+            tavolo_id = chiave.split("|")[-1]
+            cap_stimata = 4 if "Bord 1" not in tavolo_id and "Bord 2" not in tavolo_id and "Bord 3" not in tavolo_id else 2
+            totale_ospiti_calcolato += cap_stimata
+
+elif tipo_stat == "Hel månad":
+    anno_corrente = datetime.now().year
+    anno_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=anno_corrente, key="stat_month_year")
+    mese_stat = st.sidebar.selectbox(
+        "Välj månad:",
+        ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
+        index=datetime.now().month - 1
+    )
+    # Convertiamo il nome svedese del mese nel formato numerico a due cifre (es: "05")
+    mesi_mappa = {"Januari":"01", "Februari":"02", "Mars":"03", "April":"04", "Maj":"05", "Juni":"06", "Juli":"07", "Augusti":"08", "September":"09", "Oktober":"10", "November":"11", "December":"12"}
+    prefisso_mese = f"{anno_stat}-{mesi_mappa[mese_stat]}"
+    
+    for chiave, info in db_prenotazioni.items():
+        if chiave.startswith(prefisso_mese):
+            tavolo_id = chiave.split("|")[-1]
+            cap_stimata = 4 if "Bord 1" not in tavolo_id and "Bord 2" not in tavolo_id and "Bord 3" not in tavolo_id else 2
+            totale_ospiti_calcolato += cap_stimata
+
+elif tipo_stat == "Hela året":
+    anno_corrente = datetime.now().year
+    anno_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=anno_corrente, key="stat_year_only")
+    prefisso_anno = f"{anno_stat}-"
+    
+    for chiave, info in db_prenotazioni.items():
+        if chiave.startswith(prefisso_anno):
+            tavolo_id = chiave.split("|")[-1]
+            cap_stimata = 4 if "Bord 1" not in tavolo_id and "Bord 2" not in tavolo_id and "Bord 3" not in tavolo_id else 2
+            totale_ospiti_calcolato += cap_stimata
+
+# Visualizzazione del risultato finale nel box laterale svedese
+st.sidebar.metric(label="👥 Totalt antal gäster", value=f"{totale_ospiti_calcolato} st")
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
+
+
+# --- STRUMENTO DI RESET PROTETTO DA PASSWORD ---
 st.sidebar.header("🛠️ Systemverktyg")
 psw_input = st.sidebar.text_input("Ange säkerhetslösenord:", type="password")
 
@@ -52,21 +125,6 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Middag - Skift 2 (18:00 - 20:00)": {"inizio": "18:00", "fine": "20:00"},
             "Middag - Skift 3 (20:00 - 22:00)": {"inizio": "20:00", "fine": "22:00"}
         }
-
-def carica_database():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
 
 st.header("📆 Välj datum")
 oggi_completo = datetime.now()
@@ -147,7 +205,6 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index)
-    # 🔴 CORREZIONE RIGA 138: Estratta la stringa pura usando [0]
     bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
@@ -161,59 +218,3 @@ if bord_disponibili:
             nota_finale = " | ".join(lista_note)
             
             db_aggiornato = carica_database()
-            chiave_salvataggio = f"{data_chiave}|{turno_selezionato}|{bord_scelto}"
-            db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
-            salva_database(db_aggiornato)
-            
-            if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
-            if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
-            
-            st.success(f"✅ Bokning klar för {bord_scelto} under {turno_selezionato}!")
-            st.rerun()
-else:
-    st.warning("⚠️ Inga passande bord är tillgängliga under detta skift.")
-
-
-# --- 🪟 Matsalens status (Tabellöversikt) ---
-st.header(f"🪟 Matsalens status: {data_selezionata.strftime('%d/%m/%Y')}")
-
-lista_turni_del_giorno = list(TURNI.keys())
-numero_colonne = len(lista_turni_del_giorno)
-
-for t_nome, cap_max in TAVOLI_MAPPATURA.items():
-    st.markdown(f"### 📦 {t_nome} (Max: {cap_max} pers)")
-    colonne_turno = st.columns(numero_colonne)
-    
-    for indice, t_nome_orario in enumerate(lista_turni_del_giorno):
-        with colonne_turno[indice]:
-            t_bloccato = False
-            t_adiacente_local = None
-            if giorno_sett == 6:
-                if "Lunch - Skift 1" in t_nome_orario: t_adiacente_local = "Lunch - Skift 2 (13:00 - 15:00)"
-                elif "Lunch - Skift 2" in t_nome_orario: t_adiacente_local = "Lunch - Skift 1 (12:00 - 14:00)"
-            elif giorno_sett in (4, 5):
-                if "Middag - Skift 3" in t_nome_orario: t_adiacente_local = "Middag - Skift 4 (21:00 - 23:00)"
-                elif "Middag - Skift 4" in t_nome_orario: t_adiacente_local = "Middag - Skift 3 (20:00 - 22:00)"
-            
-            if t_adiacente_local and f"{data_chiave}|{t_adiacente_local}|{t_nome}" in db_prenotazioni:
-                t_bloccato = True
-
-            chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            # 🔴 CORREZIONE RIGA 191: Estratta la stringa pura usando [0]
-            nome_turno_breve = t_nome_orario.split(" (")[0]
-            
-            st.markdown(f"**{nome_turno_breve}**")
-            st.caption(f"⏰ {TURNI[t_nome_orario]['inizio']} - {TURNI[t_nome_orario]['fine']}")
-            
-            if t_bloccato:
-                info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
-                st.markdown("🟠 <span style='color: #FF5722; font-size: 20px; font-weight: bold;'>BLOCKERAT</span>", unsafe_allow_html=True)
-                st.caption(f"Bokat i nästa skift: {info_blocco['cliente']}")
-            elif chiave_specifica in db_prenotazioni:
-                info_p = db_prenotazioni[chiave_specifica]
-                st.markdown("🔴 <span style='color: #D32F2F; font-size: 20px; font-weight: bold;'>BOKAT</span>", unsafe_allow_html=True)
-                st.write(f"👤 **{info_p['cliente']}**")
-                st.write(f"📞 {info_p['tel']}")
-                if info_p.get("note"):
-                    st.caption(f"📝 {info_p['note']}")
-                
