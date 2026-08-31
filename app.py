@@ -24,10 +24,9 @@ def salva_database(db):
 
 db_prenotazioni = carica_database()
 
-# --- 📊 NUOVO PANNELLO STATISTICHE NELLA BARRA LATERALE ---
+# --- 📊 PANNELLO STATISTICHE NELLA BARRA LATERALE ---
 st.sidebar.header("📊 Statistikpanel")
 
-# Menu a tendina per scegliere il tipo di visualizzazione richiesta
 tipo_stat = st.sidebar.selectbox(
     "Välj statistikvy:",
     ["Specifik dag", "Hel månad", "Hela året"]
@@ -39,11 +38,8 @@ if tipo_stat == "Specifik dag":
     giorno_stat = st.sidebar.date_input("Välj dag för statistik:", value=datetime.now().date(), key="stat_day")
     chiave_giorno_stat = giorno_stat.isoformat()
     
-    # Scorriamo il database cercando le chiavi che iniziano con la data selezionata
     for chiave, info in db_prenotazioni.items():
         if chiave.startswith(chiave_giorno_stat):
-            # Nel database non salvavamo il numero esatto come intero, lo estraiamo se presente
-            # Se la struttura non ha salvato il numero, usiamo una stima prudente basata sul tavolo o 2 come default
             tavolo_id = chiave.split("|")[-1]
             cap_stimata = 4 if "Bord 1" not in tavolo_id and "Bord 2" not in tavolo_id and "Bord 3" not in tavolo_id else 2
             totale_ospiti_calcolato += cap_stimata
@@ -56,7 +52,6 @@ elif tipo_stat == "Hel månad":
         ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
         index=datetime.now().month - 1
     )
-    # Convertiamo il nome svedese del mese nel formato numerico a due cifre (es: "05")
     mesi_mappa = {"Januari":"01", "Februari":"02", "Mars":"03", "April":"04", "Maj":"05", "Juni":"06", "Juli":"07", "Augusti":"08", "September":"09", "Oktober":"10", "November":"11", "December":"12"}
     prefisso_mese = f"{anno_stat}-{mesi_mappa[mese_stat]}"
     
@@ -77,25 +72,42 @@ elif tipo_stat == "Hela året":
             cap_stimata = 4 if "Bord 1" not in tavolo_id and "Bord 2" not in tavolo_id and "Bord 3" not in tavolo_id else 2
             totale_ospiti_calcolato += cap_stimata
 
-# Visualizzazione del risultato finale nel box laterale svedese
 st.sidebar.metric(label="👥 Totalt antal gäster", value=f"{totale_ospiti_calcolato} st")
 st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
 
 
-# --- STRUMENTO DI RESET PROTETTO DA PASSWORD ---
+# --- 🛠️ SECURE SESSION LOGIN / LOGOUT RESET SYSTEM ---
 st.sidebar.header("🛠️ Systemverktyg")
-psw_input = st.sidebar.text_input("Ange säkerhetslösenord:", type="password")
 
-if st.sidebar.button("⚠️ NOLLSTÄLL DATABASEN", help="Klicka här för att rensa alla bokningar och starta om systemet"):
-    if psw_input == "Samuelmark123#":
+if "admin_logged_in" not in st.session_state:
+    st.session_state["admin_logged_in"] = False
+
+if not st.session_state["admin_logged_in"]:
+    psw_input = st.sidebar.text_input("Ange säkerhetslösenord:", type="password", key="admin_psw_field")
+    if st.sidebar.button("🔓 Logga in"):
+        if psw_input == "Samuelmark123#":
+            st.session_state["admin_logged_in"] = True
+            st.rerun()
+        else:
+            st.sidebar.error("❌ Felaktigt lösenord!")
+else:
+    st.sidebar.success("🔒 Systemet är upplåst")
+    
+    if st.sidebar.button("⚠️ NOLLSTÄLL DATABASEN", help="Klicka här för att rensa alla bokningar och starta om systemet"):
         if os.path.exists(DB_FILE):
             os.remove(DB_FILE)
-            st.sidebar.success("✅ Databasen har återställts! Laddar om...")
+            st.sidebar.success("✅ Databasen har återställts!")
         else:
             st.sidebar.info("Databasen är redan tom.")
+        st.session_state["admin_logged_in"] = False
         st.rerun()
-    else:
-        st.sidebar.error("❌ Felaktigt lösenord! Åtkomst nekad.")
+        
+    if st.sidebar.button("🔒 Logga ut"):
+        st.session_state["admin_logged_in"] = False
+        st.rerun()
+
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
+
 
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Måndag, 4=Fredag, 5=Lördag, 6=Söndag
@@ -217,4 +229,3 @@ if bord_disponibili:
             if altre_note.strip(): lista_note.append(altre_note.strip())
             nota_finale = " | ".join(lista_note)
             
-            db_aggiornato = carica_database()
