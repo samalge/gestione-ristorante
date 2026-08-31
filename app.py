@@ -86,7 +86,7 @@ for i in range(4, 11):  TAVOLI_MAPPATURA[f"Bord {i}"] = 4
 
 giorno_sett = data_selezionata.weekday()
 
-# Inizializziamo una variabile di stato per resettare i moduli grafici dopo il salvataggio
+# Stato di reset dinamico del form di inserimento
 if "form_reset_id" not in st.session_state:
     st.session_state["form_reset_id"] = 0
 
@@ -96,7 +96,7 @@ col_turno_sel, col1, col2, col3 = st.columns(4)
 
 lista_turni_disponibili = list(TURNI.keys())
 
-# Recuperiamo l'orario se preselezionato cliccando direttamente dal tabellone
+# Recuperiamo lo skift se selezionato via click dal tabellone inferiore
 default_turno_index = 0
 if "pre_turno" in st.session_state and st.session_state["pre_turno"] in lista_turni_disponibili:
     default_turno_index = lista_turni_disponibili.index(st.session_state["pre_turno"])
@@ -104,7 +104,6 @@ if "pre_turno" in st.session_state and st.session_state["pre_turno"] in lista_tu
 with col_turno_sel:
     turno_selezionato = st.selectbox("Välj skift för bokning:", lista_turni_disponibili, index=default_turno_index)
 
-# 🔴 FIX: Aggiunta chiave dinamica (form_reset_id) per forzare lo svuotamento dei campi ad ogni invio riuscito
 with col1:
     cognome = st.text_input("Kundens efternamn", placeholder="t.ex. Rossi", key=f"cognome_{st.session_state['form_reset_id']}").strip()
 with col2:
@@ -154,7 +153,8 @@ if "pre_tavolo" in st.session_state:
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj ledigt bord:", bord_disponibili, index=default_tavolo_index, key=f"sel_bord_{st.session_state['form_reset_id']}")
-    bord_scelto = bord_scelto_completo.split(" (")
+    # 🔴 CORREZIONE RIGIDA STRINGA TAVOLO: Prende solo la prima stringa prima della parentesi
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Boka valt bord"):
         if not cognome:
@@ -171,7 +171,7 @@ if bord_disponibili:
             db_aggiornato[chiave_salvataggio] = {"cliente": cognome, "tel": telefono, "note": nota_finale}
             salva_database(db_aggiornato)
             
-            # 🔴 Puliamo lo stato e incrementiamo il contatore per azzerare i moduli di inserimento
+            # Svuota i campi della sessione ed incrementa il reset ID
             if "pre_turno" in st.session_state: del st.session_state["pre_turno"]
             if "pre_tavolo" in st.session_state: del st.session_state["pre_tavolo"]
             st.session_state["form_reset_id"] += 1
@@ -207,6 +207,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
                 t_bloccato = True
 
             chiave_specifica = f"{data_chiave}|{t_nome_orario}|{t_nome}"
-            nome_turno_breve = t_nome_orario.split(" (")
+            # 🔴 CORREZIONE FINALE ESTRAZIONE STRINGA TURNO: Prende solo la stringa prima della parentesi aperta
+            nome_turno_breve = t_nome_orario.split(" (")[0]
             
             st.markdown(f"**{nome_turno_breve}**")
