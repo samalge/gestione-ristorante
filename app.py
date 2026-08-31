@@ -183,7 +183,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    bord_scelto = bord_scelto_completo.split(" (")
+    bord_scelto = bord_scelto_completo.split(" (")[0]
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
