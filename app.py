@@ -9,98 +9,15 @@ st.title("Centralino: Prenotazioni Telefoniche")
 
 DB_FILE = "stato_bord.json"
 
-# --- STRUMENTO DI RESET PROTETTO DA PASSWORD ---
+# --- STRUMENTO DI RESET ---
 st.sidebar.header("🛠️ Strumenti di Sistema")
-psw_input = st.sidebar.text_input("Inserisci Password di Sicurezza:", type="password")
-
 if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotazioni e riparte da zero"):
-    if psw_input == "Samuelmark123#":
-        if os.path.exists(DB_FILE):
-            os.remove(DB_FILE)
-            st.sidebar.success("✅ Database resettato! Riavvio...")
-        else:
-            st.sidebar.info("Il database è già vuoto.")
-        st.rerun()
-    else:
-        st.sidebar.error("❌ Password errata! Accesso negato.")
-
-def carica_database():
     if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
-
-
-# --- 📊 NUOVO PANNELLO STATISTICHE NELLA BARRA LATERALE ---
-st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
-st.sidebar.header("📊 Statistikpanel")
-
-tipo_stat = st.sidebar.selectbox(
-    "Välj statistikvy:",
-    ["Specifik dag", "Hel månad", "Hela året"]
-)
-
-totale_ospiti_calcolato = 0
-
-# Configurazione fissa per calcolare i posti a sedere reali dei tavoli occupati
-mappa_posti_tavoli = {
-    "Bord 1": 2, "Bord 2": 2, "Bord 3": 2,
-    "Bord 4": 4, "Bord 5": 4, "Bord 6": 4, "Bord 7": 4, "Bord 8": 4, "Bord 9": 4, "Bord 10": 4
-}
-
-# Calcoliamo la data corrente per sincronizzare i menu a tendina delle statistiche
-oggi_data = datetime.now()
-
-if tipo_stat == "Specifik dag":
-    giorno_sel_stat = st.sidebar.date_input("Välj dag:", value=oggi_data.date(), key="sidebar_stat_day")
-    prefisso_cerca = giorno_sel_stat.isoformat()
-    
-    for chiave in db_prenotazioni.keys():
-        if chiave.startswith(prefisso_cerca):
-            # Estraiamo il nome del tavolo alla fine della chiave (es: "Bord 1")
-            nome_tavolo_chiave = chiave.split("|")[-1]
-            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
-
-elif tipo_stat == "Hel månad":
-    anno_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=oggi_data.year, key="sidebar_stat_month_year")
-    mese_stat = st.sidebar.selectbox(
-        "Välj månad:",
-        ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
-        index=oggi_data.month - 1,
-        key="sidebar_stat_month_select"
-    )
-    mesi_mappa_svedese = {
-        "Januari": "01", "Februari": "02", "Mars": "03", "April": "04", "Maj": "05", "Juni": "06",
-        "Juli": "07", "Augusti": "08", "September": "09", "Oktober": "10", "November": "11", "December": "12"
-    }
-    prefisso_cerca = f"{anno_stat}-{mesi_mappa_svedese[mese_stat]}"
-    
-    for chiave in db_prenotazioni.keys():
-        if chiave.startswith(prefisso_cerca):
-            nome_tavolo_chiave = chiave.split("|")[-1]
-            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
-
-elif tipo_stat == "Hela året":
-    anno_stat_solo = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=oggi_data.year, key="sidebar_stat_year_only")
-    prefisso_cerca = f"{anno_stat_solo}-"
-    
-    for chiave in db_prenotazioni.keys():
-        if chiave.startswith(prefisso_cerca):
-            nome_tavolo_chiave = chiave.split("|")[-1]
-            totale_ospiti_calcolato += mappa_posti_tavoli.get(nome_tavolo_chiave, 2)
-
-st.sidebar.metric(label="👥 Totalt antal gäster:", value=f"{totale_ospiti_calcolato} st")
-st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
-
+        os.remove(DB_FILE)
+        st.sidebar.success("✅ Database resettato! Riavvio...")
+    else:
+        st.sidebar.info("Il database è già vuoto.")
+    st.rerun()
 
 def ottieni_turni_del_giorno(data_selezionata):
     giorno_settimana = data_selezionata.weekday() # 0=Lunedì, 4=Venerdì, 5=Sabato, 6=Domenica
@@ -130,6 +47,74 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
             "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
+
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
+
+# =========================================================================
+# 📊 BLOCCO ISOLATO: PANNELLO STATISTICHE NELLA BARRA LATERALE (A SINISTRA)
+# =========================================================================
+st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
+st.sidebar.header("📊 Statistikpanel")
+
+tipo_stat = st.sidebar.selectbox(
+    "Välj statistikvy:",
+    ["Specifik dag", "Hel månad", "Hela året"],
+    key="menu_scelta_statistiche_pizzeria"
+)
+
+totale_ospiti_calcolato = 0
+mappa_posti_fissi = {"Bord 1": 2, "Bord 2": 2, "Bord 3": 2, "Bord 4": 4, "Bord 5": 4, "Bord 6": 4, "Bord 7": 4, "Bord 8": 4, "Bord 9": 4, "Bord 10": 4}
+data_oggi_stat = datetime.now()
+
+if tipo_stat == "Specifik dag":
+    giorno_scelto_stat = st.sidebar.date_input("Välj dag:", value=data_oggi_stat.date(), key="stat_input_giorno_singolo")
+    prefisso_cerca = giorno_scelto_stat.isoformat()
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            tavolo_id = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_fissi.get(tavolo_id, 2)
+
+elif tipo_stat == "Hel månad":
+    anno_scelto_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_input_anno_mese")
+    mese_scelto_stat = st.sidebar.selectbox(
+        "Välj månad:",
+        ["Januari", "Februari", "Mars", "April", "Maj", "Juni", "Juli", "Augusti", "September", "Oktober", "November", "December"],
+        index=data_oggi_stat.month - 1,
+        key="stat_input_nome_mese"
+    )
+    mappa_mesi = {"Januari":"01", "Februari":"02", "Mars":"03", "April":"04", "Maj":"05", "Juni":"06", "Juli":"07", "Augusti":"08", "September":"09", "Oktober":"10", "November":"11", "December":"12"}
+    prefisso_cerca = f"{anno_scelto_stat}-{mappa_mesi[mese_scelto_stat]}"
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            tavolo_id = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_fissi.get(tavolo_id, 2)
+
+elif tipo_stat == "Hela året":
+    anno_solo_stat = st.sidebar.number_input("Välj år:", min_value=2024, max_value=2030, value=data_oggi_stat.year, key="stat_input_anno_intero")
+    prefisso_cerca = f"{anno_solo_stat}-"
+    for chiave in db_prenotazioni.keys():
+        if chiave.startswith(prefisso_cerca):
+            tavolo_id = chiave.split("|")[-1]
+            totale_ospiti_calcolato += mappa_posti_fissi.get(tavolo_id, 2)
+
+st.sidebar.metric(label="👥 Totalt antal gäster:", value=f"{totale_ospiti_calcolato} st")
+st.sidebar.markdown("<hr style='margin: 10px 0; border: 0.5px solid #555;'>", unsafe_allow_html=True)
+# =========================================================================
+
 
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
@@ -223,3 +208,9 @@ else:
 # --- 🪟 NUOVA INTERFACCIA: TABELLONE COMPLETO DELLA GIORNATA ---
 st.header(f"🪟 Tabellone Stato di Oggi: {data_selezionata.strftime('%d/%m/%Y')}")
 
+# Creiamo las colonne per ogni turno presente nella giornata attuale
+lista_turni_del_giorno = list(TURNI.keys())
+numero_colonne = len(lista_turni_del_giorno)
+
+# Creiamo una riga per ogni tavolo della pizzeria
+for t_nome, cap_max in TAVOLI_MAPPATURA.items():
