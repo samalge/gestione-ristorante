@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime, time
 import json
 import os
+import copy
 
 st.set_page_config(page_title="Bordshantering Pizzeria", layout="wide")
 st.title("Centralen: Telefonbokning")
@@ -69,7 +70,7 @@ TURNI = ottieni_turni_del_giorno(data_selezionata)
 with col_turno:
     turno_selezionato = st.selectbox("Välj skift:", list(TURNI.keys()))
 
-# Inizializzazione pulita e sicura per i turni del giorno selezionato
+# Inizializzazione isolata e sicura di ogni singolo skift nel database
 if data_chiave not in dati_generali:
     dati_generali[data_chiave] = {}
 
@@ -81,19 +82,20 @@ for t_nome in TURNI.keys():
 
 salva_bord(dati_generali)
 
-bord_attuali = dati_generali[data_chiave][turno_selezionato]
+# Sganciamo il dizionario corrente usando deepcopy per evitare modifiche fantasma tra i skift
+bord_attuali = copy.deepcopy(dati_generali[data_chiave][turno_selezionato])
 giorno_sett = data_selezionata.weekday()
 
-# CALCOLO DELLE SOVRAPPOSIZIONI GLOBALI (Solo per i turni sfalsati domenicali e weekend)
+# CALCOLO DELLE SOVRAPPOSIZIONI (Solo per skift parzialmente sovrapposti)
 tavoli_bloccati_da_sovrapposizione = []
 turno_adiacente = None
 
-if giorno_sett == 6:  # Domenica mattina
+if giorno_sett == 6:  # Domenica mattina sfalsata
     if "Lunch - Skift 1" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 2 (13:00 - 15:00)"
     elif "Lunch - Skift 2" in turno_selezionato:
         turno_adiacente = "Lunch - Skift 1 (12:00 - 14:00)"
-elif giorno_sett in (4, 5):  # Venerdì e Sabato sera
+elif giorno_sett in (4, 5):  # Venerdì e Sabato sera sfalsati
     if "Middag - Skift 3" in turno_selezionato:
         turno_adiacente = "Middag - Skift 4 (21:00 - 23:00)"
     elif "Middag - Skift 4" in turno_selezionato:
@@ -123,6 +125,7 @@ with col_l:
 with col_n:
     altre_note = st.text_input("Andra önskemål / info (t.ex. Barnstol)", placeholder="Skriv här...")
 
+# Generazione pulita dei tavoli selezionabili nel menu a tendina
 bord_disponibili = []
 for nome, dati in bord_attuali.items():
     if dati["stato"] == "Libero" and nome not in tavoli_bloccati_da_sovrapposizione:
@@ -133,7 +136,7 @@ for nome, dati in bord_attuali.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Välj bord att tilldela:", bord_disponibili)
-    # 🔴 FIX DEFINITIVO: Aggiunto [0] per prendere solo il testo pulito (es. "Bord 1") invece della lista
+    # CORREZIONE SICURA: prende solo il nome del tavolo (es: "Bord 1")
     bord_scelto = bord_scelto_completo.split(" (")[0] 
     
     if st.button("Boka valt bord"):
@@ -146,14 +149,14 @@ if bord_disponibili:
             if altre_note.strip(): lista_note.append(altre_note.strip())
             nota_finale = " | ".join(lista_note)
             
-            bord_attuali[bord_scelto] = {
+            # Scrittura diretta nel database generale isolato per evitare conflitti
+            dati_generali[data_chiave][turno_selezionato][bord_scelto] = {
                 "stato": "Occupato",
                 "max_cap": bord_attuali[bord_scelto]["max_cap"],
                 "cliente": cognome,
                 "tel": telefono,
                 "note": nota_finale
             }
-            dati_generali[data_chiave][turno_selezionato] = bord_attuali
             salva_bord(dati_generali)
             st.success(f"✅ Bokning klar! {bord_scelto} har tilldelats till {cognome}")
             st.rerun()
@@ -176,9 +179,8 @@ for nome, dati in bord_attuali.items():
         elif dati["stato"] == "Libero":
             st.markdown(f"🟢 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> ({cap_testo}) | TILLGÄNGLIGT", unsafe_allow_html=True)
         else:
-            info_cliente = f"Gäst: {dati.get('cliente', '')} ({dati.get('tel', '')})"
             st.markdown(f"🔴 <span style='color: #FFD166; font-size: 24px; font-weight: bold;'>{nome}</span> ({cap_testo}) | UPPTAGET", unsafe_allow_html=True)
-            st.write(f"👉 {info_cliente}")
+            st.write(f"👉 Gäst: {dati['cliente']} ({dati['tel']})")
             if dati.get("note"):
                 st.warning(f"📋 **Allergier/Önskemål:** {dati['note']}")
             
@@ -186,8 +188,7 @@ for nome, dati in bord_attuali.items():
         if nome in tavoli_bloccati_da_sovrapposizione:
             st.write("🔒 *Hantera bokningen via det andra skiftet*")
         elif dati["stato"] == "Occupato" and st.button("Frigör bord", key=f"free_{nome}_{turno_selezionato}"):
-            bord_attuali[nome] = {"stato": "Libero", "max_cap": dati["max_cap"], "cliente": "", "tel": "", "note": ""}
-            dati_generali[data_chiave][turno_selezionato] = bord_attuali
+            dati_generali[data_chiave][turno_selezionato][nome] = {"stato": "Libero", "max_cap": dati["max_cap"], "cliente": "", "tel": "", "note": ""}
             salva_bord(dati_generali)
             st.rerun()
             
