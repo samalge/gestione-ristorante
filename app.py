@@ -9,6 +9,53 @@ st.title("Centralino: Prenotazioni Telefoniche")
 
 DB_FILE = "stato_bord.json"
 
+def carica_database():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def salva_database(db):
+    with open(DB_FILE, "w") as f:
+        json.dump(db, f, indent=4)
+
+db_prenotazioni = carica_database()
+
+
+# =========================================================================
+# 📊 ISOLATED SIDEBAR SUMMARY PANEL (LEFT SIDE) - TOTALLY INDEPENDENT
+# =========================================================================
+st.sidebar.header("📊 Riepilogo Prenotazioni")
+
+totale_giorno_attuale = 0
+totale_mese_attuale = 0
+totale_anno_attuale = 0
+
+# Track the system timestamps safely
+oggi_dt = datetime.now()
+data_chiave_oggi = oggi_dt.date().isoformat()
+stringa_filtro_mese = oggi_dt.strftime("%Y-%m")
+stringa_filtro_anno = oggi_dt.strftime("%Y-")
+
+# Read database keys without touching internal loop variables
+for chiave_pizzeria in db_prenotazioni.keys():
+    if chiave_pizzeria.startswith(data_chiave_oggi):
+        totale_giorno_attuale += 1
+    if chiave_pizzeria.startswith(stringa_filtro_mese):
+        totale_mese_attuale += 1
+    if chiave_pizzeria.startswith(stringa_filtro_anno):
+        totale_anno_attuale += 1
+
+st.sidebar.metric(label="📆 Tavoli prenotati oggi", value=f"{totale_giorno_attuale}")
+st.sidebar.metric(label="🗓️ Totale tavoli questo mese", value=f"{totale_mese_attuale}")
+st.sidebar.metric(label="👑 Totale tavoli questo anno", value=f"{totale_anno_attuale}")
+st.sidebar.markdown("<hr style='margin: 15px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
+# =========================================================================
+
+
 # --- STRUMENTO DI RESET ---
 st.sidebar.header("🛠️ Strumenti di Sistema")
 if st.sidebar.button("⚠️ RESETTA DATABASE", help="Cancella tutte le prenotazioni e riparte da zero"):
@@ -47,21 +94,6 @@ def ottieni_turni_del_giorno(data_selezionata):
             "Cena - Turno 2 (18:00 - 20:00)": {"inizio": time(18, 0), "fine": time(20, 0)},
             "Cena - Turno 3 (20:00 - 22:00)": {"inizio": time(20, 0), "fine": time(22, 0)}
         }
-
-def carica_database():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def salva_database(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=4)
-
-db_prenotazioni = carica_database()
 
 st.header("📆 Selezione Data")
 oggi_completo = datetime.now()
@@ -130,8 +162,7 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
 
 if bord_disponibili:
     bord_scelto_completo = st.selectbox("Seleziona tavolo libero per questo turno:", bord_disponibili)
-    # 🔴 FIX: Estratta la stringa di testo pulita aggiungendo l'indice [0]
-    bord_scelto = bord_scelto_completo.split(" (")[0]
+    bord_scelto = bord_scelto_completo.split(" (")
     
     if st.button("Conferma Prenotazione Tavolo"):
         if not cognome:
@@ -189,26 +220,3 @@ for t_nome, cap_max in TAVOLI_MAPPATURA.items():
             if t_bloccato:
                 info_blocco = db_prenotazioni[f"{data_chiave}|{t_adiacente_local}|{t_nome}"]
                 st.markdown("🟠 BLOCCATO")
-                st.caption(f"Occupato di fianco da: {info_blocco['cliente']}")
-            elif chiave_specifica in db_prenotazioni:
-                info_p = db_prenotazioni[chiave_specifica]
-                st.markdown("🔴 OCCUPATO")
-                st.write(f"👤 **{info_p['cliente']}**")
-                st.write(f"📞 {info_p['tel']}")
-                if info_p.get("note"):
-                    st.caption(f"📝 {info_p['note']}")
-                
-                if st.button("Libera", key=f"del_{chiave_specifica}"):
-                    db_cancella = carica_database()
-                    if chiave_specifica in db_cancella:
-                        del db_cancella[chiave_specifica]
-                        salva_database(db_cancella)
-                    st.rerun()
-            else:
-                st.markdown("🟢 LIBERO")
-                if st.button("Boka", key=f"book_{chiave_specifica}"):
-                    st.session_state["pre_turno"] = t_nome_orario
-                    st.session_state["pre_tavolo"] = t_nome
-                    st.rerun()
-                
-    st.markdown("<hr style='margin: 8px 0; border: 0.5px solid #444;'>", unsafe_allow_html=True)
